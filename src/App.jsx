@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import logo from './assets/images/logo.png'
+import logoSlogan from './assets/images/logo_slogan.png'
 import './App.css'
+import VideoGenerator from './components/VideoGenerator'
 
 function App() {
-  const [count, setCount] = useState(0)
 
   return (
-    <>
-      <img src={logo} style={{ width: '400px', height: '400px' }} alt="React logo" />
-      <h1>MiceSpace</h1>
-    </>
+    <div className="flex justify-center items-center w-screen flex-col gap-12">
+      <div className="max-w-2xl">
+        <img src={logoSlogan} className="" alt="React logo" />
+        <VideoGenerator />
+      </div>
+    </div>
   )
 }
 
