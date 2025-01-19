@@ -1,8 +1,28 @@
-# React + Vite
+# MiceSpace
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MiceSpace is a web application where users can upload their own videos, and an AI generates a fun and entertaining mice band video from it.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Upload your own videos
+- AI-generated mice band videos
+
+## Technologies Used
+
+- React
+- Vite
+- ESLint
+- CSS
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+
+### Installation
+
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/your-username/micespace.git
