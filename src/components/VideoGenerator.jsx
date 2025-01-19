@@ -72,7 +72,7 @@ function VideoGenerator() {
             "https://api.minimaxi.chat/v1/video_generation",
             {
             model,
-            prompt: "The camera pans down and there is a band of tiny mice playing musical instruments.",
+            prompt: "Camera pans down to a realistic mice band playing musical instruments.",
             first_frame_image: lastFrameDataUrl,
             },
             {
