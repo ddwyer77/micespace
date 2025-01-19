@@ -6,9 +6,9 @@ import VideoGenerator from './components/VideoGenerator'
 function App() {
 
   return (
-    <div className="flex justify-center items-center w-screen flex-col gap-12">
-      <div className="max-w-2xl">
-        <img src={logoSlogan} className="" alt="React logo" />
+    <div className="flex justify-center items-center w-screen flex-col">
+      <div className="max-w-2xl flex flex-col gap-4">
+        <img src={logoSlogan} alt="micespace logo" />
         <VideoGenerator />
       </div>
     </div>
