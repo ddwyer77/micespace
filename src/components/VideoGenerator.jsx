@@ -8,13 +8,13 @@ function VideoGenerator() {
   const [status, setStatus] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [progress, setProgress] = useState(0); 
 
   const apiKey = import.meta.env.VITE_API_KEY;
   const model = "video-01";
 
   // Cycle through loading messages
   useEffect(() => {
-    console.log("Test");
     if (!loading) return;
 
     const interval = setInterval(() => {
@@ -41,10 +41,13 @@ function VideoGenerator() {
 
     setLoading(true);
     setStatus("Processing video...");
+    setProgress(10);
 
     try {
         console.log("Uploading video file...");
         const videoElement = document.createElement("video");
+        setStatus("Your video is being processed. This could take up to 5 minutes. Please don't close the page.");
+        setProgress(20);
         videoElement.src = URL.createObjectURL(videoFile);
         videoElement.muted = true;
 
@@ -86,7 +89,7 @@ function VideoGenerator() {
         );
 
         const { task_id } = createTaskResponse.data;
-        setStatus("Your video is being processed. This could take up to 5 minutes. Please don't close the page.");
+        setStatus("Processing... This could take up to 5 minutes.");
 
         // Poll MiniMaxi service for video generation completion
         let taskStatus = "Queueing";
@@ -105,21 +108,35 @@ function VideoGenerator() {
             const { status, file_id } = queryResponse.data;
             taskStatus = status;
 
-            if (status === "Success") {
-            const fetchResponse = await axios.get(
-                `https://api.minimaxi.chat/v1/files/retrieve?file_id=${file_id}`,
-                {
-                headers: { Authorization: `Bearer ${apiKey}` },
-                }
-            );
+            if (["Queueing", "Processing", "Preparing"].includes(taskStatus) && status !== taskStatus) {
+                setStatus(taskStatus);
+            }
 
-            generatedVideoUrl = fetchResponse.data.file.download_url;
-            setDownloadUrl(generatedVideoUrl);
-            break;
+            if (taskStatus === "Queueing") {
+                setProgress(30);
+              } else if (taskStatus === "Processing") {
+                setProgress(60);
+              } else if (taskStatus === "Preparing") {
+                setProgress(90);
+              }
+
+            if (status === "Success") {
+                const fetchResponse = await axios.get(
+                    `https://api.minimaxi.chat/v1/files/retrieve?file_id=${file_id}`,
+                    {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                    }
+                );
+
+                generatedVideoUrl = fetchResponse.data.file.download_url;
+                setDownloadUrl(generatedVideoUrl);
+                setProgress(100);
+                break;
             } else if (status === "Fail") {
-            setStatus("AI video generation failed.");
-            setLoading(false);
-            return;
+                setStatus("AI video generation failed.");
+                console.error("AI video generation failed.");
+                setLoading(false);
+                return;
             }
         }
 
@@ -127,10 +144,10 @@ function VideoGenerator() {
         
 
         } catch (error) {
-        setStatus("An error occurred. Please try again.");
-        console.error(error);
+            setStatus("An error occurred. Please try again.");
+            console.error(error);
         } finally {
-        setLoading(false);
+            setLoading(false);
         }
     };
 
@@ -150,7 +167,6 @@ function VideoGenerator() {
             disabled={loading || !videoFile}
             className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
             style={{
-            background: loading ? "gray" : "primary",
             cursor: loading ? "not-allowed" : "pointer",
             }}
         >
@@ -158,16 +174,25 @@ function VideoGenerator() {
         </button>
 
         {loading && (
-            <div className="mt-4 justify-center flex flex-col">
-                <div class="loading">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
+            
+                <div className="mt-4 justify-center flex flex-col items-center w-full">
+                    <div class="loading">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                        <div
+                        className="bg-primary h-4 rounded-full"
+                        style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                    <p>{loadingMessages[loadingMessageIndex]}</p>
                 </div>
-            <p>{loadingMessages[loadingMessageIndex]}</p>
-            </div>
+    
+            
         )}
 
         {status && <p className="mt-4 text-gray-700">{status}</p>}
@@ -176,7 +201,7 @@ function VideoGenerator() {
             <a
             href={downloadUrl}
             download
-            className="block bg-green-600 text-white px-4 rounded-lg w-full text-center py-4"
+            className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
             >
             Download Video
             </a>
