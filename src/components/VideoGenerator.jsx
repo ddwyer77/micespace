@@ -14,6 +14,7 @@ function VideoGenerator() {
 
   // Cycle through loading messages
   useEffect(() => {
+    console.log("Test");
     if (!loading) return;
 
     const interval = setInterval(() => {
@@ -42,6 +43,7 @@ function VideoGenerator() {
     setStatus("Processing video...");
 
     try {
+        console.log("Uploading video file...");
         const videoElement = document.createElement("video");
         videoElement.src = URL.createObjectURL(videoFile);
         videoElement.muted = true;
