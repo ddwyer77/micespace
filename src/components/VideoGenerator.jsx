@@ -44,7 +44,6 @@ function VideoGenerator() {
     setProgress(10);
 
     try {
-        console.log("Uploading video file...");
         const videoElement = document.createElement("video");
         setStatus("Your video is being processed. This could take up to 5 minutes. Please don't close the page.");
         setProgress(20);
