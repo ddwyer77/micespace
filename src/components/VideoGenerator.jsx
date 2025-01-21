@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
 import mergeVideos from "../utils/mergeVideos.js";
-import uploadVideo from "../utils/uploadVideo.js"; 
+import { getFileUrl, uploadFile } from "../utils/storage.js";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null); // Uploaded video file
@@ -11,6 +11,7 @@ function VideoGenerator() {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
+    const [originalVideoDownloadUrl, setOriginalVideoDownloadUrl] = useState("");
 
     const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
     const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
@@ -47,8 +48,13 @@ function VideoGenerator() {
         setProgress(10);
 
         try {
-            // const uploadedVideoUrl = await uploadVideo(videoFile, apiKeyShotStack);
-            // console.log("Uploaded video URL:", uploadedVideoUrl);
+            try {
+                const originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
+                setOriginalVideoDownloadUrl(originalVidUrl);
+                console.log("File uploaded successfully. Download URL:", originalVideoDownloadUrl);
+            } catch (error) {
+                console.error("Error uploading file:", error);
+            }
 
             const videoElement = document.createElement("video");
             setStatus("Initializing video processing...");
@@ -143,7 +149,7 @@ function VideoGenerator() {
                     setStatus("Merging videos...");
 
                     // Merge Videos
-                    const videoUrls = ["https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/cliffs-sunset.mp4", generatedVideoUrl];
+                    const videoUrls = [originalVideoDownloadUrl, generatedVideoUrl];
               
                     try {
                         const mergedVideoUrl = await mergeVideos(videoUrls,apiKeyShotStack);
