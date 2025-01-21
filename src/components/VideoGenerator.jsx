@@ -11,7 +11,6 @@ function VideoGenerator() {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
-    const [originalVideoDownloadUrl, setOriginalVideoDownloadUrl] = useState("");
 
     const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
     const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
@@ -47,11 +46,11 @@ function VideoGenerator() {
         setStatus("Initializing video...");
         setProgress(10);
 
+        let originalVidUrl = ""; 
+
         try {
             try {
-                const originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
-                setOriginalVideoDownloadUrl(originalVidUrl);
-                console.log("File uploaded successfully. Download URL:", originalVideoDownloadUrl);
+                originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
             } catch (error) {
                 console.error("Error uploading file:", error);
             }
@@ -149,7 +148,7 @@ function VideoGenerator() {
                     setStatus("Merging videos...");
 
                     // Merge Videos
-                    const videoUrls = [originalVideoDownloadUrl, generatedVideoUrl];
+                    const videoUrls = [originalVidUrl, generatedVideoUrl];
               
                     try {
                         const mergedVideoUrl = await mergeVideos(videoUrls,apiKeyShotStack);
@@ -179,60 +178,60 @@ function VideoGenerator() {
 
     return (
         <div className="flex flex-col gap-4 justify-center items-center">
-        <h1 className="text-lg font-bold">Video Generator</h1>
+            <h1 className="text-lg font-bold">Video Generator</h1>
 
-        <input
-            type="file"
-            accept="video/*"
-            onChange={handleVideoUpload}
-            className="block w-full mt-2 border rounded-lg p-2"
-        />
+            <input
+                type="file"
+                accept="video/*"
+                onChange={handleVideoUpload}
+                className="block w-full mt-2 border rounded-lg p-2"
+            />
 
-        <button
-            onClick={handleGenerateVideo}
-            disabled={loading || !videoFile}
-            className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
-            style={{
-            cursor: loading ? "not-allowed" : "pointer",
-            }}
-        >
-            {loading ? "Processing..." : "Generate Video"}
-        </button>
-
-        {loading && (
-            
-                <div className="mt-4 justify-center flex flex-col items-center w-full">
-                    <div className="loading">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div
-                        className="bg-primary h-4 rounded-full"
-                        style={{ width: `${progress}%` }}
-                        ></div>
-                    </div>
-                    <p>{loadingMessages[loadingMessageIndex]}</p>
-                </div>
-    
-            
-        )}
-
-        {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 5 minutes. Please don't close the page.</p>)}
-        {status && <p className="mt-4 text-gray-700">{status}</p>}
-
-        {downloadUrl && (
-            <a
-            href={downloadUrl}
-            download
-            className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
+            <button
+                onClick={handleGenerateVideo}
+                disabled={loading || !videoFile}
+                className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
+                style={{
+                cursor: loading ? "not-allowed" : "pointer",
+                }}
             >
-            Download Video
-            </a>
-        )}
+                {loading ? "Processing..." : "Generate Video"}
+            </button>
+
+            {loading && (
+                
+                    <div className="mt-4 justify-center flex flex-col items-center w-full">
+                        <div className="loading">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                            <div
+                            className="bg-primary h-4 rounded-full"
+                            style={{ width: `${progress}%` }}
+                            ></div>
+                        </div>
+                        <p>{loadingMessages[loadingMessageIndex]}</p>
+                    </div>
+        
+                
+            )}
+
+            {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 5 minutes. Please don't close the page.</p>)}
+            {status && <p className="mt-4 text-gray-700">{status}</p>}
+
+            {downloadUrl && (
+                <a
+                href={downloadUrl}
+                download
+                className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
+                >
+                Download Video
+                </a>
+            )}
         </div>
     );
 }
