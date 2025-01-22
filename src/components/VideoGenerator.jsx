@@ -5,6 +5,7 @@ import mergeVideos from "../utils/mergeVideos.js";
 import { getFileUrl, uploadFile } from "../utils/storage.js";
 import trimVideo from "../utils/trimVideo.js";
 import getLastFrame from "../utils/getLastFrame.js";
+import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null); // Uploaded video file
@@ -13,6 +14,7 @@ function VideoGenerator() {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
+    const audioUrl = "https://firebasestorage.googleapis.com/v0/b/gigs-bfe8f.appspot.com/o/audio%2FMicebandoglink.m4a?alt=media&token=b92d23af-6170-46b1-8df8-a2771291ae34";
 
     const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
     const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
@@ -44,7 +46,7 @@ function VideoGenerator() {
     }
 
     const handleCriticalError = (message) => {
-        setTatus(message);
+        setStatus(message);
         setProgress(0);
         setLoading(false);
     }
@@ -82,7 +84,6 @@ function VideoGenerator() {
             try {
                 handleUpdateStatus("Trimming video...", 20);
                 trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack);
-                console.log("Trimmed video URL:", trimmedVideoUrl);
             } catch (error) {
                 console.error("Error:", error);
                 handleCriticalError("Failed to trim video.");
@@ -95,7 +96,6 @@ function VideoGenerator() {
             try {
                 handleUpdateStatus("Fetching last frame...", 30);
                 lastFrameDataUrl = await getLastFrame(trimmedVideoUrl); 
-                console.log("Last frame data URL:", lastFrameDataUrl);
             } catch (error) {
                 console.error("Error fetching last frame:", error);
                 handleCriticalError("Failed to fetch last frame.");
@@ -149,7 +149,7 @@ function VideoGenerator() {
                 } else if (taskStatus === "Processing") {
                     handleUpdateStatus("Video generation is in progress. This step takes a while.", 60);
                 } else if (taskStatus === "Preparing") {
-                    handleUpdateStatus("Preparing the video...", 70);
+                    handleUpdateStatus("Preparing the video...", 90);
                 }
 
                 if (status === "Success") {
@@ -167,9 +167,16 @@ function VideoGenerator() {
                     // ********************************************
                     const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
                     try {
-                        const mergedVideoUrl = await mergeVideos(videoUrls,apiKeyShotStack);
+                        const mergedVideoUrl = await mergeVideos(videoUrls, apiKeyShotStack);
                         setDownloadUrl(mergedVideoUrl);
                         handleUpdateStatus("Video generated successfully.", 100);
+                        
+                        try {
+                            uploadGeneratedVideosForFeed(downloadUrl);
+                        } catch (error) {
+                            console.warn("Failed to upload generated video for feed:", error);
+                        }
+
                     } catch (mergeError) {
                         console.error("Failed to merge videos:", mergeError);
                         setStatus("Failed to merge videos.");
