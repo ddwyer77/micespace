@@ -3,6 +3,8 @@ import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
 import mergeVideos from "../utils/mergeVideos.js";
 import { getFileUrl, uploadFile } from "../utils/storage.js";
+import trimVideo from "../utils/trimVideo.js";
+import getLastFrame from "../utils/getLastFrame.js";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null); // Uploaded video file
@@ -36,72 +38,90 @@ function VideoGenerator() {
         }
     };
 
+    const handleUpdateStatus = (message, progress) =>{
+        setStatus(message);
+        setProgress(progress);
+    }
+
+    const handleCriticalError = (message) => {
+        setTatus(message);
+        setProgress(0);
+        setLoading(false);
+    }
+
     const handleGenerateVideo = async () => {
         if (!videoFile) {
-            setStatus("Please upload a video file.");
+            handleUpdateStatus("Please upload a video file.", 0);
             return;
         }
 
         setLoading(true);
-        setStatus("Initializing video...");
-        setProgress(10);
+        handleUpdateStatus("Initializing process...", 5);
 
         let originalVidUrl = ""; 
+        let trimmedVideoUrl = "";
+        let lastFrameDataUrl = "";
 
         try {
+            // ********************************************
+            // *     Upload Original Video To Firebase
+            // ********************************************
             try {
+                handleUpdateStatus("Saving original video...", 10);
                 originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
             } catch (error) {
                 console.error("Error uploading file:", error);
+                handleCriticalError("Failed to upload video.");
+                return;
             }
 
-            const videoElement = document.createElement("video");
-            setStatus("Initializing video processing...");
-            setProgress(20);
-            videoElement.src = URL.createObjectURL(videoFile);
-            videoElement.muted = false;
 
-            const lastFrameDataUrl = await new Promise((resolve, reject) => {
-                videoElement.onloadedmetadata = () => {
-                videoElement.currentTime = videoElement.duration; // Seek to the last frame
-                };
+            // ********************************************
+            // *     Trim Video To 4 Seconds
+            // ********************************************
+            try {
+                handleUpdateStatus("Trimming video...", 20);
+                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack);
+                console.log("Trimmed video URL:", trimmedVideoUrl);
+            } catch (error) {
+                console.error("Error:", error);
+                handleCriticalError("Failed to trim video.");
+                return;
+            }
 
-                videoElement.onseeked = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-                resolve(canvas.toDataURL("image/png"));
-                };
-
-                videoElement.onerror = () => reject(new Error("Failed to process video."));
-            });
-
-            setStatus("Extracting frames...");
-            setProgress(30);
-
-            // Send the last frame to the MiniMaxi service
+            // ********************************************
+            // *     Fetch Last Frame
+            // ********************************************
+            try {
+                handleUpdateStatus("Fetching last frame...", 30);
+                lastFrameDataUrl = await getLastFrame(trimmedVideoUrl); 
+                console.log("Last frame data URL:", lastFrameDataUrl);
+            } catch (error) {
+                console.error("Error fetching last frame:", error);
+                handleCriticalError("Failed to fetch last frame.");
+                return;
+            }
+            
+                        
+            // ********************************************
+            // *     Send Request to MiniMaxi 
+            // ********************************************
+            handleUpdateStatus("Generating Mice Video...", 40);
             const createTaskResponse = await axios.post(
                 "https://api.minimaxi.chat/v1/video_generation",
                 {
-                model,
-                prompt: "Camera pans over and down and there is a band of mice rocking out and jamming and playing drums and guitar.",
-                first_frame_image: lastFrameDataUrl,
+                    model,
+                    prompt: "Camera pans over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.",
+                    first_frame_image: lastFrameDataUrl,
                 },
                 {
-                headers: {
-                    Authorization: `Bearer ${apiKeyMiniMaxi}`,
-                    "Content-Type": "application/json",
-                },
+                    headers: {
+                        Authorization: `Bearer ${apiKeyMiniMaxi}`,
+                        "Content-Type": "application/json",
+                    },
                 }
             );
-
             const { task_id } = createTaskResponse.data;
-            setStatus("Generating mice band video. This could take a while...");
-            setProgress(40);
 
             // Poll MiniMaxi service for video generation completion
             let taskStatus = "Queueing";
@@ -125,36 +145,31 @@ function VideoGenerator() {
                 }
 
                 if (taskStatus === "Queueing") {
-                    setStatus("Video generation is in the queue...");
-                    setProgress(50);
+                    handleUpdateStatus("Video generation is in the queue...", 50);
                 } else if (taskStatus === "Processing") {
-                    setStatus("Video generation is in progress. This step takes a while.");
-                    setProgress(60);
+                    handleUpdateStatus("Video generation is in progress. This step takes a while.", 60);
                 } else if (taskStatus === "Preparing") {
-                    setStatus("Preparing the video...");
-                    setProgress(70);
+                    handleUpdateStatus("Preparing the video...", 70);
                 }
 
                 if (status === "Success") {
                     const fetchResponse = await axios.get(
                         `https://api.minimaxi.chat/v1/files/retrieve?file_id=${file_id}`,
                         {
-                        headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
+                            headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
                         }
                     );
-
                     generatedVideoUrl = fetchResponse.data.file.download_url;
-                    setProgress(75);
-                    setStatus("Merging videos...");
+  
 
-                    // Merge Videos
-                    const videoUrls = [originalVidUrl, generatedVideoUrl];
-              
+                    // ********************************************
+                    // *     Merge Videos
+                    // ********************************************
+                    const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
                     try {
                         const mergedVideoUrl = await mergeVideos(videoUrls,apiKeyShotStack);
                         setDownloadUrl(mergedVideoUrl);
-                        setStatus("Video generated successfully.");
-                        setProgress(100);
+                        handleUpdateStatus("Video generated successfully.", 100);
                     } catch (mergeError) {
                         console.error("Failed to merge videos:", mergeError);
                         setStatus("Failed to merge videos.");
@@ -177,8 +192,9 @@ function VideoGenerator() {
     };
 
     return (
-        <div className="flex flex-col gap-4 justify-center items-center">
-            <h1 className="text-lg font-bold">Video Generator</h1>
+        <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
+            <h1>MiceBand.com</h1>
+            <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
 
             <input
                 type="file"
