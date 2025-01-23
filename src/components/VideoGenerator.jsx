@@ -14,7 +14,8 @@ function VideoGenerator() {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
-    const audioUrl = "https://firebasestorage.googleapis.com/v0/b/gigs-bfe8f.appspot.com/o/audio%2FMicebandoglink.m4a?alt=media&token=b92d23af-6170-46b1-8df8-a2771291ae34";
+    const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
+    const clipLength = 4;
 
     const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
     const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
@@ -147,9 +148,9 @@ function VideoGenerator() {
                 if (taskStatus === "Queueing") {
                     handleUpdateStatus("Video generation is in the queue...", 50);
                 } else if (taskStatus === "Processing") {
-                    handleUpdateStatus("Video generation is in progress. This step takes a while.", 60);
+                    handleUpdateStatus("Video generation is in progress. This step takes a while.", 55);
                 } else if (taskStatus === "Preparing") {
-                    handleUpdateStatus("Preparing the video...", 90);
+                    handleUpdateStatus("Preparing the video...", 60);
                 }
 
                 if (status === "Success") {
@@ -167,7 +168,7 @@ function VideoGenerator() {
                     // ********************************************
                     const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
                     try {
-                        const mergedVideoUrl = await mergeVideos(videoUrls, apiKeyShotStack);
+                        const mergedVideoUrl = await mergeVideos(videoUrls, apiKeyShotStack, audioUrl, clipLength);
                         setDownloadUrl(mergedVideoUrl);
                         handleUpdateStatus("Video generated successfully.", 100);
                         

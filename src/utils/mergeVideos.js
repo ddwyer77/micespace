@@ -1,42 +1,52 @@
 import axios from "axios";
 
-const mergeVideos = async (videoUrls, apiKeyShotStack, maxPollingTime = 300000) => {
+const mergeVideos = async (videoUrls, apiKeyShotStack, audioUrl, clipLength, maxPollingTime = 300000) => {
     try {
-        const clips = videoUrls.map((url, index) => ({
-            asset: { type: "video", src: url },
-            start: index === 0 ? 0 : "auto", // Start at 0 for the first clip, auto for subsequent clips
-            length: "auto", // Let Shotstack automatically handle length
-        }));
-
-        // Prepare tracks
         const tracks = [
-            { clips }, // Video track
-        ];
-        
-        tracks.push({
-            clips: [
-                {
-                    asset: {
-                        type: "audio",
-                        src: "https://firebasestorage.googleapis.com/v0/b/gigs-bfe8f.appspot.com/o/audio%2FMicebandoglink.m4a?alt=media&token=b92d23af-6170-46b1-8df8-a2771291ae34",
-                        trim: 0, // Start at the beginning of the audio file
-                        volume: 1, // Full volume
-                        speed: 1, // Normal playback speed
-                        effect: "fadeInFadeOut", // Optional: Fade in and out the audio
+            {
+                clips: [
+                    {
+                        asset: {
+                            type: "video",
+                            src: videoUrls[0],
+                        },
+                        start: 0,
+                        length: clipLength,
+                        },
+                        {
+                        asset: {
+                            type: "video",
+                            src: videoUrls[1],
+                        },
+                        start: clipLength,
+                        length: clipLength,
                     },
-                    start: clips[1].start, // Sync audio with the start of the second video
-                    length: "auto", // Match the length of the second video
-                },
-            ],
-        });
-        
+                ],
+            },
+            {
+                clips: [
+                    {
+                        asset: {
+                            type: "audio",
+                            src: audioUrl,
+                            trim: 0,
+                            volume: 1,
+                            speed: 1,
+                            effect: "fadeInFadeOut",
+                        },
+                        start: clipLength,
+                        length: clipLength,
+                    },
+                ],
+            },
+        ];
+          
   
         const requestBody = {
             timeline: {
-            tracks: [{ clips }],
+                tracks,
             },
             output: { format: "mp4", size: { width: 1280, height: 720 } },
-            // 1080 x 1920
         };
     
         const renderResponse = await axios.post(
