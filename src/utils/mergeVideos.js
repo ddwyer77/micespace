@@ -32,7 +32,6 @@ const mergeVideos = async (videoUrls, apiKeyShotStack, audioUrl, clipLength, max
                             trim: 0,
                             volume: 1,
                             speed: 1,
-                            effect: "fadeInFadeOut",
                         },
                         start: clipLength,
                         length: clipLength,
@@ -46,7 +45,7 @@ const mergeVideos = async (videoUrls, apiKeyShotStack, audioUrl, clipLength, max
             timeline: {
                 tracks,
             },
-            output: { format: "mp4", size: { width: 1280, height: 720 } },
+            output: { format: "mp4", size: { width: 720, height: 1280 } },
         };
     
         const renderResponse = await axios.post(

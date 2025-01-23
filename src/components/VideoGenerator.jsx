@@ -6,6 +6,7 @@ import { getFileUrl, uploadFile } from "../utils/storage.js";
 import trimVideo from "../utils/trimVideo.js";
 import getLastFrame from "../utils/getLastFrame.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
+import logoSlogan from '../assets/images/logo_slogan.png'
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null); // Uploaded video file
@@ -202,6 +203,7 @@ function VideoGenerator() {
     return (
         <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
             <h1>MiceBand.com</h1>
+            <img src={logoSlogan} alt="micespace logo"/>
             <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
 
             <input
