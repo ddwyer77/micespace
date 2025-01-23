@@ -7,7 +7,7 @@ import axios from "axios";
  * @param {number} maxPollingTime - Maximum time to wait for render completion (in ms).
  * @returns {Promise<string>} - A promise that resolves with the URL of the trimmed video.
  */
-const trimVideo = async (videoUrl, apiKey, maxPollingTime = 300000) => {
+const trimVideo = async (videoUrl, apiKey, clipLength, maxPollingTime = 300000) => {
     try {
         // Step 1: Send the trim request to the API
         const requestBody = {
@@ -21,7 +21,7 @@ const trimVideo = async (videoUrl, apiKey, maxPollingTime = 300000) => {
                                     src: videoUrl, // Video URL to trim
                                 },
                                 start: 0, // Start from the beginning
-                                length: 4, // Trim to 4 seconds
+                                length: clipLength,
                             },
                         ],
                     },

@@ -16,7 +16,7 @@ function VideoGenerator() {
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
-    const clipLength = 4;
+    const clipLength = 5;
 
     const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
     const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
@@ -81,11 +81,11 @@ function VideoGenerator() {
 
 
             // ********************************************
-            // *     Trim Video To 4 Seconds
+            // *     Trim Video To 5 Seconds
             // ********************************************
             try {
                 handleUpdateStatus("Trimming video...", 20);
-                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack);
+                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack, clipLength);
             } catch (error) {
                 console.error("Error:", error);
                 handleCriticalError("Failed to trim video.");

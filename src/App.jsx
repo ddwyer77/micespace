@@ -1,6 +1,7 @@
 import './App.css'
 import VideoGenerator from './components/VideoGenerator'
-import Header from './components/Header'
+import Header from './components/Header';
+// import Feed from './components/Feed';
 
 function App() {
 
@@ -9,6 +10,7 @@ function App() {
       <Header />
       <div className="max-w-2xl flex flex-col gap-4">
         <VideoGenerator />
+        {/* <Feed /> */}
       </div>
     </div>
   )

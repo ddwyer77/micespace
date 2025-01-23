@@ -9,7 +9,7 @@ import axios from "axios";
  * @param {number} duration      - Approximate duration of the video in seconds (default 4).
  * @returns {Promise<string>}    - Resolves to the URL of the snapshot image.
  */
-const getLastFrame = async (videoUrl, shotstackApiKey, duration = 4) => {
+const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
   try {
     // Seek just before the end to avoid exact boundary issues
     const trimTime = Math.max(duration - 0.1, 0);

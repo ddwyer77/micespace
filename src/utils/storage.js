@@ -1,6 +1,6 @@
 // utils/firebaseUtils.js
 import { initializeApp } from "firebase/app";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
 
 // Replace with your Firebase configuration
 const firebaseConfig = {
@@ -39,12 +39,22 @@ export const uploadFile = async (file, path) => {
  * @param {string} path - The storage path of the file.
  * @returns {Promise<string>} - Returns a promise that resolves with the file's download URL.
  */
-export const getFileUrl = async (path) => {
-    try {
-        const storageRef = ref(storage, path);
-        return await getDownloadURL(storageRef);
-    } catch (error) {
-        console.error('Error retrieving file URL:', error);
-        throw error;
-    }
-};
+// export const getFileUrl = async (path) => {
+//     try {
+//         const storageRef = ref(storage, path);
+//         return await getDownloadURL(storageRef);
+//     } catch (error) {
+//         console.error('Error retrieving file URL:', error);
+//         throw error;
+//     }
+// };
+
+export const getFileUrl = async (folderPath) => {
+    const storage = getStorage();
+    const folderRef = ref(storage, folderPath);
+    const fileList = await listAll(folderRef);
+    console.log("File List:", fileList); // Debugging
+    const urls = await Promise.all(fileList.items.map(item => getDownloadURL(item)));
+    console.log("URLs:", urls); // Debugging
+    return urls;
+  };
