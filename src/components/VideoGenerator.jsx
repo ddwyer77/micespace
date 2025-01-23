@@ -97,7 +97,9 @@ function VideoGenerator() {
             // ********************************************
             try {
                 handleUpdateStatus("Fetching last frame...", 30);
-                lastFrameDataUrl = await getLastFrame(trimmedVideoUrl); 
+                // lastFrameDataUrl = await getLastFrame(trimmedVideoUrl); 
+                lastFrameDataUrl = await getLastFrame(trimmedVideoUrl, apiKeyShotStack, clipLength);
+                console.log(lastFrameDataUrl);
             } catch (error) {
                 console.error("Error fetching last frame:", error);
                 handleCriticalError("Failed to fetch last frame.");
@@ -133,10 +135,10 @@ function VideoGenerator() {
                 await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
 
                 const queryResponse = await axios.get(
-                `https://api.minimaxi.chat/v1/query/video_generation?task_id=${task_id}`,
-                {
-                    headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
-                }
+                    `https://api.minimaxi.chat/v1/query/video_generation?task_id=${task_id}`,
+                    {
+                        headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
+                    }
                 );
 
                 const { status, file_id } = queryResponse.data;
@@ -202,7 +204,7 @@ function VideoGenerator() {
 
     return (
         <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
-            <h1>MiceBand.com</h1>
+            {/* <h1>MiceBand.com</h1> */}
             <img src={logoSlogan} alt="micespace logo"/>
             <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
 
@@ -246,7 +248,7 @@ function VideoGenerator() {
                 
             )}
 
-            {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 5 minutes. Please don't close the page.</p>)}
+            {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 8 minutes. Please don't close the page.</p>)}
             {status && <p className="mt-4 text-gray-700">{status}</p>}
 
             {downloadUrl && (
