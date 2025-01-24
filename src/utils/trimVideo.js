@@ -7,7 +7,8 @@ import axios from "axios";
  * @param {number} maxPollingTime - Maximum time to wait for render completion (in ms).
  * @returns {Promise<string>} - A promise that resolves with the URL of the trimmed video.
  */
-const trimVideo = async (videoUrl, apiKey, clipLength, maxPollingTime = 300000) => {
+const trimVideo = async (videoUrl, apiKey, clipLength, isVerticalVideo, maxPollingTime = 300000) => {
+    const videoRotation = isVerticalVideo ? 90 : 0;
     try {
         // Step 1: Send the trim request to the API
         const requestBody = {
@@ -22,6 +23,12 @@ const trimVideo = async (videoUrl, apiKey, clipLength, maxPollingTime = 300000) 
                                 },
                                 start: 0, // Start from the beginning
                                 length: clipLength,
+                                transform: {
+                                    rotate: {
+                                        angle: videoRotation,
+                                    }
+                                },
+                                scale: 0.5,
                             },
                         ],
                     },
@@ -29,7 +36,8 @@ const trimVideo = async (videoUrl, apiKey, clipLength, maxPollingTime = 300000) 
             },
             output: {
                 format: "mp4", // Output format
-                resolution: "sd", // Resolution (can be adjusted)
+                resolution: "hd",
+                aspectRatio: "9:16",
             },
         };
 
@@ -45,7 +53,7 @@ const trimVideo = async (videoUrl, apiKey, clipLength, maxPollingTime = 300000) 
         );
 
         const renderId = renderResponse.data.response.id;
-        console.log("Render started with ID:", renderId);
+        console.log("Render started");
 
         // Step 2: Poll the API for render status
         const startTime = Date.now();

@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "watch": "npx tailwindcss -i ./src/index.css -o ./src/App.css --watch"
+    "watch": "npx tailwindcss -i ./src/index.css -o ./src/App.css --watch",
+    "netlifyDev": "netlify dev"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",

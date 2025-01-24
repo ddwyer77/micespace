@@ -5,6 +5,7 @@ import mergeVideos from "../utils/mergeVideos.js";
 import { getFileUrl, uploadFile } from "../utils/storage.js";
 import trimVideo from "../utils/trimVideo.js";
 import getLastFrame from "../utils/getLastFrame.js";
+import fetchEnvVar from "../utils/fetchEnvVar.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png'
 
@@ -15,6 +16,9 @@ function VideoGenerator() {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
+    const [isVerticalVideo, setIsVerticalVideo] = useState(false);
+    // const [apiKeyMiniMaxi, setApiKeyMiniMaxi] = useState("");
+    // const [apiKeyShotStack, setApiKeyShotStack] = useState("");
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
 
@@ -33,9 +37,41 @@ function VideoGenerator() {
         return () => clearInterval(interval);
     }, [loading]);
 
+
+
+    // useEffect(() => {
+    //     const getMiniMaxiKey = async () => {
+    //         const value = await fetchEnvVar("VITE_API_KEY_MINIMAXI");
+    //         setApiKeyMiniMaxi(value);
+    //     };
+    //     const getShotStackKey = async () => {
+    //         const value = await fetchEnvVar("VITE_API_KEY_SHOTSTACK");
+    //         setApiKeyShotStack(value);
+    //     };
+    //     getMiniMaxiKey();
+    //     getShotStackKey();
+    // }, [apiKeyMiniMaxi, apiKeyShotStack]);
+
+
+
+
     // Handle video upload
     const handleVideoUpload = (event) => {
         const file = event.target.files[0];
+
+
+        const url = URL.createObjectURL(file);
+        const video = document.createElement("video");
+        video.src = url;
+      
+        video.onloadedmetadata = () => {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            setIsVerticalVideo(height > width);
+            URL.revokeObjectURL(url);
+        }
+
+
         if (file) {
             setVideoFile(file);
             setStatus(""); // Reset status
@@ -85,7 +121,7 @@ function VideoGenerator() {
             // ********************************************
             try {
                 handleUpdateStatus("Trimming video...", 20);
-                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack, clipLength);
+                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack, clipLength, isVerticalVideo);
             } catch (error) {
                 console.error("Error:", error);
                 handleCriticalError("Failed to trim video.");

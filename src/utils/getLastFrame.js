@@ -33,9 +33,9 @@ const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
         ],
       },
       output: {
-        format: "jpg",       // Could also be "png"
-        resolution: "hd",    // "sd", "hd", "mobile"
-        // aspectRatio: "9:16" or "1:1" if you want a custom shape
+        format: "jpg",
+        resolution: "hd",  
+        aspectRatio: "9:16"
       },
     };
 
