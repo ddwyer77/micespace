@@ -12,6 +12,10 @@ export default {
           DEFAULT: '#D94125', 
           dark: '#d55147', 
         },
+        gray: {
+          light: '#EEEDED',
+          DEFAULT: '#151515'
+        }
       },
     },
   },

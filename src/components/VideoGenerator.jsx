@@ -4,6 +4,7 @@ import loadingMessages from "../utils/loadingMessages.js";
 import { getFileUrl, uploadFile } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png'
+import VideoDownloader from "./VideoDownloader.jsx";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
@@ -113,7 +114,6 @@ function VideoGenerator() {
                 return;
             }
 
-
             // ********************************************
             // *     Trim Video To 5 Seconds
             // ********************************************
@@ -141,10 +141,11 @@ function VideoGenerator() {
                 });
                 lastFrameDataUrl = response.data.renderUrl;
                 console.log("Last Frame:", lastFrameDataUrl);
-              } catch (error) {
+            } catch (error) {
                 console.error("Error fetching last frame:", error);
+                handleCriticalError("Failed to fetch last frame.");
                 throw error;
-              }
+            }
                         
             // ********************************************
             // *     Send Request to MiniMaxi 
@@ -175,6 +176,12 @@ function VideoGenerator() {
 
             setDownloadUrl(mergedVideoUrl);
             handleUpdateStatus("Video generated successfully.", 100);
+
+            try {
+                await uploadGeneratedVideosForFeed(originalVidUrl, trimmedVideoUrl, mergedVideoUrl);
+            } catch (error) {
+                console.error("Error uploading generated videos for feed:", error);
+            }
 
         } catch (error) {
             console.error("Error generating video:", error.message);
@@ -209,38 +216,39 @@ function VideoGenerator() {
             </button>
 
             {loading && (
-                
-                    <div className="mt-4 justify-center flex flex-col items-center w-full">
-                        <div className="loading">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-4">
-                            <div
-                            className="bg-primary h-4 rounded-full"
-                            style={{ width: `${progress}%` }}
-                            ></div>
-                        </div>
-                        <p>{loadingMessages[loadingMessageIndex]}</p>
+                <div className="mt-4 justify-center flex flex-col items-center w-full">
+                    <div className="loading">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
                     </div>
-        
-                
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                        <div
+                        className="bg-primary h-4 rounded-full"
+                        style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                    <p>{loadingMessages[loadingMessageIndex]}</p>
+                </div>
             )}
 
             {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 8 minutes. Please don't close the page.</p>)}
             {status && <p className="mt-4 text-gray-700">{status}</p>}
 
             {downloadUrl && (
-                <a
-                href={downloadUrl}
-                download
-                className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
-                >
-                Download Video
-                </a>
+                <div className="w-full flex flex-col gap-4">
+                    <a
+                        href={downloadUrl}
+                        target="_blank"
+                        download
+                        className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
+                        >
+                        View Video
+                    </a>
+                    <VideoDownloader videoUrl={downloadUrl} fileName="miceband_video.mp4" />
+                </div>
             )}
         </div>
     );
