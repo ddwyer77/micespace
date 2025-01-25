@@ -1,60 +1,60 @@
 // utils/firebaseUtils.js
 import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
+import axios from "axios";
 
-// Replace with your Firebase configuration
-const firebaseConfig = {
-    apiKey: import.meta.env.VITE_API_KEY_FIREBASE,
-    authDomain: import.meta.env.VITE_AUTH_DOMAIN_FIREBASE,
-    projectId: import.meta.env.VITE_PROJECT_ID_FIREBASE,
-    storageBucket: import.meta.env.VITE_STORAGE_BUCKET_FIREBASE,
-    messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID_FIREBASE,
-    appId: import.meta.env.VITE_APP_ID_FIREBASE
+let app;
+let storage;
+
+export const initializeFirebase = async () => {
+    if (!app) {
+      try {
+        // Fetch Firebase config from Netlify function
+        const response = await axios.get("/.netlify/functions/firebaseConfig");
+        const firebaseConfig = response.data;
+  
+        // Initialize Firebase app and storage
+        app = initializeApp(firebaseConfig);
+        storage = getStorage(app);
+      } catch (error) {
+        console.error("Error initializing Firebase:", error);
+        throw error;
+      }
+    }
+    return { app, storage };
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const storage = getStorage(app);
 
-/**
- * Upload a file to Firebase Storage.
- * @param {File} file - The file to upload.
- * @param {string} path - The storage path to upload the file to.
- * @returns {Promise<string>} - Returns a promise that resolves with the file's download URL.
- */
 export const uploadFile = async (file, path) => {
     try {
+        if (!storage) {
+            await initializeFirebase();
+        }
+    
         const storageRef = ref(storage, path);
         const snapshot = await uploadBytes(storageRef, file);
-        console.log('Uploaded file:', snapshot.metadata.fullPath);
+        console.log("Uploaded file:", snapshot.metadata.fullPath);
         return await getDownloadURL(snapshot.ref);
     } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error("Error uploading file:", error);
         throw error;
     }
 };
-
-/**
- * Retrieve a file's download URL from Firebase Storage.
- * @param {string} path - The storage path of the file.
- * @returns {Promise<string>} - Returns a promise that resolves with the file's download URL.
- */
-// export const getFileUrl = async (path) => {
-//     try {
-//         const storageRef = ref(storage, path);
-//         return await getDownloadURL(storageRef);
-//     } catch (error) {
-//         console.error('Error retrieving file URL:', error);
-//         throw error;
-//     }
-// };
-
-export const getFileUrl = async (folderPath) => {
-    const storage = getStorage();
-    const folderRef = ref(storage, folderPath);
-    const fileList = await listAll(folderRef);
-    console.log("File List:", fileList); // Debugging
-    const urls = await Promise.all(fileList.items.map(item => getDownloadURL(item)));
-    console.log("URLs:", urls); // Debugging
-    return urls;
-  };
+  
+    export const getFileUrl = async (folderPath) => {
+        try {
+            if (!storage) {
+                await initializeFirebase();
+            }
+    
+            const folderRef = ref(storage, folderPath);
+            const fileList = await listAll(folderRef);
+            console.log("File List:", fileList); // Debugging
+            const urls = await Promise.all(fileList.items.map((item) => getDownloadURL(item)));
+            console.log("URLs:", urls); // Debugging
+            return urls;
+        } catch (error) {
+            console.error("Error fetching file URLs:", error);
+            throw error;
+        }
+};

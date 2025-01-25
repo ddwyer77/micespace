@@ -1,32 +1,21 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
-import mergeVideos from "../utils/mergeVideos.js";
 import { getFileUrl, uploadFile } from "../utils/storage.js";
-import trimVideo from "../utils/trimVideo.js";
-import getLastFrame from "../utils/getLastFrame.js";
-import fetchEnvVar from "../utils/fetchEnvVar.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png'
 
 function VideoGenerator() {
-    const [videoFile, setVideoFile] = useState(null); // Uploaded video file
+    const [videoFile, setVideoFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState("");
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
     const [isVerticalVideo, setIsVerticalVideo] = useState(false);
-    // const [apiKeyMiniMaxi, setApiKeyMiniMaxi] = useState("");
-    // const [apiKeyShotStack, setApiKeyShotStack] = useState("");
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
 
-    const apiKeyMiniMaxi = import.meta.env.VITE_API_KEY_MINIMAXI;
-    const apiKeyShotStack = import.meta.env.VITE_API_KEY_SHOTSTACK;
-    const model = "video-01";
-
-    // Cycle through loading messages
     useEffect(() => {        
         if (!loading) return;
 
@@ -37,25 +26,6 @@ function VideoGenerator() {
         return () => clearInterval(interval);
     }, [loading]);
 
-
-
-    // useEffect(() => {
-    //     const getMiniMaxiKey = async () => {
-    //         const value = await fetchEnvVar("VITE_API_KEY_MINIMAXI");
-    //         setApiKeyMiniMaxi(value);
-    //     };
-    //     const getShotStackKey = async () => {
-    //         const value = await fetchEnvVar("VITE_API_KEY_SHOTSTACK");
-    //         setApiKeyShotStack(value);
-    //     };
-    //     getMiniMaxiKey();
-    //     getShotStackKey();
-    // }, [apiKeyMiniMaxi, apiKeyShotStack]);
-
-
-
-
-    // Handle video upload
     const handleVideoUpload = (event) => {
         const file = event.target.files[0];
 
@@ -74,7 +44,7 @@ function VideoGenerator() {
 
         if (file) {
             setVideoFile(file);
-            setStatus(""); // Reset status
+            setStatus(""); 
         }
     };
 
@@ -88,6 +58,33 @@ function VideoGenerator() {
         setProgress(0);
         setLoading(false);
     }
+
+    const pollTaskStatus = async (task_id) => {
+        try {
+            let status = "Queueing";
+            let generatedVideoUrl = "";
+
+            while (["Queueing", "Processing", "Preparing"].includes(status)) {
+                await new Promise((resolve) => setTimeout(resolve, 20000)); // Wait 5 seconds
+
+                const response = await axios.post("/.netlify/functions/checkTaskStatus", { task_id });
+                const data = response.data;
+                status = data.status;
+
+                if (status === "Success") {
+                    generatedVideoUrl = data.generatedVideoUrl;
+                    return generatedVideoUrl;
+                } else if (status === "Fail") {
+                    throw new Error("Video generation failed.");
+                }
+
+                handleUpdateStatus(`Video generation status: ${status}`, 50);
+            }
+        } catch (error) {
+            console.error("Error polling task status:", error);
+            handleCriticalError("Failed to generate video.");
+        }
+    };
 
     const handleGenerateVideo = async () => {
         if (!videoFile) {
@@ -109,6 +106,7 @@ function VideoGenerator() {
             try {
                 handleUpdateStatus("Saving original video...", 10);
                 originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
+                console.log("Uploaded Video:", originalVidUrl);
             } catch (error) {
                 console.error("Error uploading file:", error);
                 handleCriticalError("Failed to upload video.");
@@ -121,118 +119,66 @@ function VideoGenerator() {
             // ********************************************
             try {
                 handleUpdateStatus("Trimming video...", 20);
-                trimmedVideoUrl = await trimVideo(originalVidUrl, apiKeyShotStack, clipLength, isVerticalVideo);
+                const response = await axios.post("/.netlify/functions/trimVideo", {
+                  videoUrl: originalVidUrl,
+                  clipLength,
+                  isVerticalVideo,
+                });
+                trimmedVideoUrl = response.data.trimmedVideoUrl;
+                console.log("Trimmed Video:", trimmedVideoUrl);
             } catch (error) {
-                console.error("Error:", error);
+                console.error(error);
                 handleCriticalError("Failed to trim video.");
                 return;
             }
-
             // ********************************************
             // *     Fetch Last Frame
             // ********************************************
             try {
-                handleUpdateStatus("Fetching last frame...", 30);
-                // lastFrameDataUrl = await getLastFrame(trimmedVideoUrl); 
-                lastFrameDataUrl = await getLastFrame(trimmedVideoUrl, apiKeyShotStack, clipLength);
-                console.log(lastFrameDataUrl);
-            } catch (error) {
+                const response = await axios.post("/.netlify/functions/getLastFrame", {
+                    trimmedVideoUrl,
+                    clipLength,
+                });
+                lastFrameDataUrl = response.data.renderUrl;
+                console.log("Last Frame:", lastFrameDataUrl);
+              } catch (error) {
                 console.error("Error fetching last frame:", error);
-                handleCriticalError("Failed to fetch last frame.");
-                return;
-            }
-            
+                throw error;
+              }
                         
             // ********************************************
             // *     Send Request to MiniMaxi 
             // ********************************************
             handleUpdateStatus("Generating Mice Video...", 40);
-            const createTaskResponse = await axios.post(
-                "https://api.minimaxi.chat/v1/video_generation",
-                {
-                    model,
-                    prompt: "Camera pans over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.",
-                    first_frame_image: lastFrameDataUrl,
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${apiKeyMiniMaxi}`,
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-            const { task_id } = createTaskResponse.data;
+            const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
+                model: "video-01",
+                prompt: "The Camera smoothly pans without delay over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.",
+                first_frame_image: lastFrameDataUrl,
+            });
 
-            // Poll MiniMaxi service for video generation completion
-            let taskStatus = "Queueing";
-            let generatedVideoUrl = "";
+            const { task_id } = response.data;
+            console.log("Task ID:", task_id);
 
-            while (["Queueing", "Processing", "Preparing"].includes(taskStatus)) {
-                await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+            const generatedVideoUrl = await pollTaskStatus(task_id);
+            console.log("Generated Video URL:", generatedVideoUrl);
 
-                const queryResponse = await axios.get(
-                    `https://api.minimaxi.chat/v1/query/video_generation?task_id=${task_id}`,
-                    {
-                        headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
-                    }
-                );
+            // Proceed to merge the videos
+            const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
+            const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
+                videoUrls,
+                audioUrl,
+                clipLength,
+            });
 
-                const { status, file_id } = queryResponse.data;
-                taskStatus = status;
+            const mergedVideoUrl = mergeResponse.data.renderUrl;
+            console.log("Merged Video URL:", mergedVideoUrl);
 
-                if (["Queueing", "Processing", "Preparing"].includes(taskStatus) && status !== taskStatus) {
-                    setStatus(taskStatus);
-                }
+            setDownloadUrl(mergedVideoUrl);
+            handleUpdateStatus("Video generated successfully.", 100);
 
-                if (taskStatus === "Queueing") {
-                    handleUpdateStatus("Video generation is in the queue...", 50);
-                } else if (taskStatus === "Processing") {
-                    handleUpdateStatus("Video generation is in progress. This step takes a while.", 55);
-                } else if (taskStatus === "Preparing") {
-                    handleUpdateStatus("Preparing the video...", 60);
-                }
-
-                if (status === "Success") {
-                    const fetchResponse = await axios.get(
-                        `https://api.minimaxi.chat/v1/files/retrieve?file_id=${file_id}`,
-                        {
-                            headers: { Authorization: `Bearer ${apiKeyMiniMaxi}` },
-                        }
-                    );
-                    generatedVideoUrl = fetchResponse.data.file.download_url;
-  
-
-                    // ********************************************
-                    // *     Merge Videos
-                    // ********************************************
-                    const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
-                    try {
-                        const mergedVideoUrl = await mergeVideos(videoUrls, apiKeyShotStack, audioUrl, clipLength);
-                        setDownloadUrl(mergedVideoUrl);
-                        handleUpdateStatus("Video generated successfully.", 100);
-                        
-                        try {
-                            uploadGeneratedVideosForFeed(downloadUrl);
-                        } catch (error) {
-                            console.warn("Failed to upload generated video for feed:", error);
-                        }
-
-                    } catch (mergeError) {
-                        console.error("Failed to merge videos:", mergeError);
-                        setStatus("Failed to merge videos.");
-                    }
-
-                    break;
-                } else if (status === "Fail") {
-                    setStatus("AI video generation failed.");
-                    console.error("AI video generation failed.");
-                    setLoading(false);
-                    return;
-                }
-            }
         } catch (error) {
-            setStatus("An error occurred. Please try again.");
-            console.error(error);
+            console.error("Error generating video:", error.message);
+            handleCriticalError("Failed to generate video.");
         } finally {
             setLoading(false);
         }

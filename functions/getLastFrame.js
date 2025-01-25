@@ -1,18 +1,25 @@
-import axios from "axios";
+const axios = require("axios");
 
-/**
- * Extracts (or "snapshots") the last frame of a video using Shotstack, 
- * returning the direct URL to the rendered image on success.
- *
- * @param {string} videoUrl      - Publicly accessible URL of the source video.
- * @param {string} shotstackApiKey - Your Shotstack API key.
- * @param {number} duration      - Approximate duration of the video in seconds (default 4).
- * @returns {Promise<string>}    - Resolves to the URL of the snapshot image.
- */
-const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
+exports.handler = async (event) => {
   try {
-    // Seek just before the end to avoid exact boundary issues
-    const trimTime = Math.max(duration - 0.1, 0);
+    // Fetch Shotstack API Key from environment variables
+    const shotstackApiKey = process.env.VITE_API_KEY_SHOTSTACK;
+    if (!shotstackApiKey) {
+      throw new Error("Missing Shotstack API key in environment variables.");
+    }
+
+    // Parse request body
+    const { trimmedVideoUrl, clipLength = 5 } = JSON.parse(event.body);
+
+    if (!trimmedVideoUrl) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing required parameter: trimmedVideoUrl" }),
+      };
+    }
+
+    // Seek just before the end of the video
+    const trimTime = Math.max(clipLength - 0.1, 0);
 
     const requestBody = {
       timeline: {
@@ -22,7 +29,7 @@ const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
               {
                 asset: {
                   type: "video",
-                  src: videoUrl,
+                  src: trimmedVideoUrl,
                   trim: trimTime,
                 },
                 start: 0,
@@ -34,13 +41,12 @@ const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
       },
       output: {
         format: "jpg",
-        resolution: "hd",  
-        aspectRatio: "9:16"
+        resolution: "hd",
+        aspectRatio: "9:16",
       },
     };
 
     // 1) Send render request
-    //    Change 'stage' to 'v1' if you are ready for production.
     const renderResponse = await axios.post(
       "https://api.shotstack.io/edit/stage/render",
       requestBody,
@@ -79,12 +85,16 @@ const getLastFrame = async (videoUrl, shotstackApiKey, duration = 5) => {
       throw new Error("Shotstack snapshot render failed.");
     }
 
-    // 3) Return the direct URL to the image (hosted by Shotstack)
-    return renderUrl;
+    // 3) Return the direct URL to the image
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ renderUrl }),
+    };
   } catch (error) {
-    console.error("Failed to fetch last frame via Shotstack:", error);
-    throw error;
+    console.error("Error in getLastFrame function:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message }),
+    };
   }
 };
-
-export default getLastFrame;
