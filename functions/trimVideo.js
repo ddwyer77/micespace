@@ -43,7 +43,7 @@ exports.handler = async (event) => {
 
     // 3) Start render
     const renderResponse = await axios.post(
-      "https://api.shotstack.io/stage/render",
+      "https://api.shotstack.io/v1/render",
       requestBody,
       {
         headers: {
@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       await new Promise((resolve) => setTimeout(resolve, 5000));
 
       const statusRes = await axios.get(
-        `https://api.shotstack.io/stage/render/${renderId}`,
+        `https://api.shotstack.io/v1/render/${renderId}`,
         {
           headers: {
             "x-api-key": shotstackKey,

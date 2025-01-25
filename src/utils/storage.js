@@ -24,7 +24,6 @@ export const initializeFirebase = async () => {
     return { app, storage };
 };
 
-
 export const uploadFile = async (file, path) => {
     try {
         if (!storage) {
@@ -41,20 +40,20 @@ export const uploadFile = async (file, path) => {
     }
 };
   
-    export const getFileUrl = async (folderPath) => {
-        try {
-            if (!storage) {
-                await initializeFirebase();
-            }
-    
-            const folderRef = ref(storage, folderPath);
-            const fileList = await listAll(folderRef);
-            console.log("File List:", fileList); // Debugging
-            const urls = await Promise.all(fileList.items.map((item) => getDownloadURL(item)));
-            console.log("URLs:", urls); // Debugging
-            return urls;
-        } catch (error) {
-            console.error("Error fetching file URLs:", error);
-            throw error;
+export const getFileUrl = async (folderPath) => {
+    try {
+        if (!storage) {
+            await initializeFirebase();
         }
+
+        const folderRef = ref(storage, folderPath);
+        const fileList = await listAll(folderRef);
+        console.log("File List:", fileList); // Debugging
+        const urls = await Promise.all(fileList.items.map((item) => getDownloadURL(item)));
+        console.log("URLs:", urls); // Debugging
+        return urls;
+    } catch (error) {
+        console.error("Error fetching file URLs:", error);
+        throw error;
+    }
 };
