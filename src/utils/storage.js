@@ -45,12 +45,9 @@ export const getFileUrl = async (folderPath) => {
         if (!storage) {
             await initializeFirebase();
         }
-
         const folderRef = ref(storage, folderPath);
         const fileList = await listAll(folderRef);
-        console.log("File List:", fileList); // Debugging
         const urls = await Promise.all(fileList.items.map((item) => getDownloadURL(item)));
-        console.log("URLs:", urls); // Debugging
         return urls;
     } catch (error) {
         console.error("Error fetching file URLs:", error);

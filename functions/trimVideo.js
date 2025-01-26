@@ -2,14 +2,12 @@ const axios = require("axios");
 
 exports.handler = async (event) => {
   try {
-    // 1) Fetch the secret key from Netlify environment variables
     const shotstackKey = process.env.VITE_API_KEY_SHOTSTACK; 
     if (!shotstackKey) {
       throw new Error("Missing SHOTSTACK_API_KEY environment variable");
     }
 
-    const { videoUrl, clipLength, isVerticalVideo } = JSON.parse(event.body);
-    const videoRotation = isVerticalVideo ? 90 : 0;
+    const { videoUrl, clipLength } = JSON.parse(event.body);
  
     const requestBody = {
       timeline: {
@@ -23,12 +21,6 @@ exports.handler = async (event) => {
                 },
                 start: 0,
                 length: clipLength,
-                transform: {
-                  rotate: {
-                    angle: videoRotation,
-                  },
-                },
-                scale: 0.5,
               },
             ],
           },

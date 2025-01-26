@@ -9,17 +9,21 @@ import VideoDownloader from "./VideoDownloader.jsx";
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [status, setStatus] = useState("");
     const [downloadUrl, setDownloadUrl] = useState("");
     const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const [progress, setProgress] = useState(0); 
-    const [isVerticalVideo, setIsVerticalVideo] = useState(false);
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
+    const [ ingestedVideoId, setIngestedVideoId ] = useState("");
+    let originalVidUrl = ""; 
+    let ingestedVideoUrl = "";
+    let trimmedVideoUrl = "";
+    let lastFrameDataUrl = "";
 
     useEffect(() => {        
         if (!loading) return;
-
         const interval = setInterval(() => {
         setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % loadingMessages.length);
         }, 2000);
@@ -27,26 +31,42 @@ function VideoGenerator() {
         return () => clearInterval(interval);
     }, [loading]);
 
-    const handleVideoUpload = (event) => {
+    const handleVideoUpload = async (event) => {
+        setUploading(true);
         const file = event.target.files[0];
-
-
-        const url = URL.createObjectURL(file);
-        const video = document.createElement("video");
-        video.src = url;
+    
+        if (!file) {
+            console.error("No file selected");
+            return;
+        }
+    
+        setVideoFile(file);
+        setStatus("");
+    
+        try {
+            // Upload to Firebase
+            handleUpdateStatus("Saving original video...", 0);
+            const originalVidUrl = await uploadFile(file, `videos/${file.name}`);
+            console.log("Uploaded Video:", originalVidUrl);
+    
+            // Compress the uploaded video
+            handleUpdateStatus("Compressing video...", 0);
+            const response = await axios.post("/.netlify/functions/compressVideo", { videoUrl: originalVidUrl, type: getFileExtension(file.name) });
+            console.log("Compression Response:", response.data.data.id);
+            setIngestedVideoId(response.data.data.id);
+    
+            handleUpdateStatus("Video uploaded.", 0);
+            setUploading(false);
+        } catch (error) {
+            console.error("Error processing video:", error);
+            handleCriticalError("Failed to process video.");
+            setUploading(false);
+        }
+    };
       
-        video.onloadedmetadata = () => {
-            const width = video.videoWidth;
-            const height = video.videoHeight;
-            setIsVerticalVideo(height > width);
-            URL.revokeObjectURL(url);
-        }
-
-
-        if (file) {
-            setVideoFile(file);
-            setStatus(""); 
-        }
+    const getFileExtension = (filename) => {
+        const match = filename.match(/\.([a-zA-Z0-9]+)$/);
+        return match ? match[1].toLowerCase() : '';
     };
 
     const handleUpdateStatus = (message, progress) =>{
@@ -87,6 +107,29 @@ function VideoGenerator() {
         }
     };
 
+    const pollIngestedVideo = async (videoId, maxRetries = 30, delay = 5000) => {
+        let retries = 0;
+        while (retries < maxRetries) {
+            try {
+                const response = await axios.post("/.netlify/functions/getIngestedVideo", {
+                    videoId,
+                });
+                const rendition = response.data.attributes.outputs.renditions[0];
+                if (rendition && rendition.url) {
+                    console.log("Ingested Video URL:", rendition.url);
+                    return rendition.url;
+                }
+            } catch (error) {
+                console.error(`Error getting ingested video (attempt ${retries + 1}):`, error.message);
+            }
+        
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            retries++;
+        }
+    
+        throw new Error("Ingested video is not ready after maximum retries.");
+    };
+
     const handleGenerateVideo = async () => {
         if (!videoFile) {
             handleUpdateStatus("Please upload a video file.", 0);
@@ -96,22 +139,15 @@ function VideoGenerator() {
         setLoading(true);
         handleUpdateStatus("Initializing process...", 5);
 
-        let originalVidUrl = ""; 
-        let trimmedVideoUrl = "";
-        let lastFrameDataUrl = "";
-
         try {
             // ********************************************
-            // *     Upload Original Video To Firebase
+            // *     Get Ingested Video
             // ********************************************
             try {
-                handleUpdateStatus("Saving original video...", 10);
-                originalVidUrl = await uploadFile(videoFile, `videos/${videoFile.name}`);
-                console.log("Uploaded Video:", originalVidUrl);
+                ingestedVideoUrl = await pollIngestedVideo(ingestedVideoId);
+                console.log("Ingested Video Url:", ingestedVideoUrl);
             } catch (error) {
-                console.error("Error uploading file:", error);
-                handleCriticalError("Failed to upload video.");
-                return;
+                console.error("Error getting ingested video:", error.message);
             }
 
             // ********************************************
@@ -120,9 +156,8 @@ function VideoGenerator() {
             try {
                 handleUpdateStatus("Trimming video...", 20);
                 const response = await axios.post("/.netlify/functions/trimVideo", {
-                  videoUrl: originalVidUrl,
-                  clipLength,
-                  isVerticalVideo,
+                  videoUrl: ingestedVideoUrl,
+                  clipLength
                 });
                 trimmedVideoUrl = response.data.trimmedVideoUrl;
                 console.log("Trimmed Video:", trimmedVideoUrl);
@@ -193,7 +228,6 @@ function VideoGenerator() {
 
     return (
         <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
-            {/* <h1>MiceBand.com</h1> */}
             <img src={logoSlogan} alt="micespace logo"/>
             <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
 
@@ -204,16 +238,26 @@ function VideoGenerator() {
                 className="block w-full mt-2 border rounded-lg p-2"
             />
 
-            <button
-                onClick={handleGenerateVideo}
-                disabled={loading || !videoFile}
-                className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
-                style={{
-                cursor: loading ? "not-allowed" : "pointer",
-                }}
-            >
-                {loading ? "Processing..." : "Generate Video"}
-            </button>
+            {(uploading || loading) ? (
+                <button
+                    disabled
+                    className="bg-gray-200 text-white py-4 rounded-lg mt-4 w-full border-none"
+                >
+                    Loading...
+                </button>
+                ) : (
+                <button
+                    onClick={handleGenerateVideo}
+                    disabled={loading || !videoFile}
+                    className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
+                    style={{
+                    cursor: loading ? "not-allowed" : "pointer",
+                    }}
+                >
+                    {loading ? "Processing..." : "Generate Video"}
+                </button>
+            )}
+            
 
             {loading && (
                 <div className="mt-4 justify-center flex flex-col items-center w-full">
