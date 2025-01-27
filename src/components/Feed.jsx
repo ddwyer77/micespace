@@ -20,7 +20,7 @@ const Feed = () => {
           try {
               const response = await getFileUrl('generatedVideos/');
               const shuffledVideos = shuffleArray(response);
-              const selectedVideos = shuffledVideos.slice(0, 30);
+              const selectedVideos = shuffledVideos.slice(0, 50);
               setGeneratedVideos(selectedVideos);
           } catch (error) {
               console.error("Error fetching generated videos:", error);
@@ -59,7 +59,7 @@ const Feed = () => {
           transition={{ duration: 0.5 }}
           className="absolute w-full h-full flex items-center justify-center"
         >
-          <video className="w-full h-full object-cover rounded-2xl shadow-lg" controls autoPlay muted loop alt={`Slide ${currentIndex}`} ref={videoRef}>
+          <video className="w-full h-full object-cover rounded-2xl shadow-lg" controls autoPlay muted alt={`Slide ${currentIndex}`} ref={videoRef} onEnded={handleNext}>
                  <source src={generatedVideos[currentIndex]} type="video/mp4"/>
           </video>
         </motion.div>
