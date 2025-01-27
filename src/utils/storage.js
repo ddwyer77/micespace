@@ -24,18 +24,14 @@ export const initializeFirebase = async () => {
     return { app, storage };
 };
 
-export const uploadFile = async (file, path) => {
+export const uploadFile = async (fileBlob, path) => {
     try {
-        if (!storage) {
-            await initializeFirebase();
-        }
-    
-        const storageRef = ref(storage, path);
-        const snapshot = await uploadBytes(storageRef, file);
-        console.log("Uploaded file:", snapshot.metadata.fullPath);
-        return await getDownloadURL(snapshot.ref);
+        const fileRef = ref(storage, path);
+        await uploadBytes(fileRef, fileBlob);
+        const downloadUrl = await getDownloadURL(fileRef);
+        return downloadUrl;
     } catch (error) {
-        console.error("Error uploading file:", error);
+        console.error("Error uploading file to Firebase:", error);
         throw error;
     }
 };

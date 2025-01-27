@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { getFileUrl } from "../utils/storage.js";
 import { motion } from "framer-motion";
 
 const Feed = () => {
     const [generatedVideos, setGeneratedVideos] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const videoRef = useRef(null);
 
     const handlePrev = () => {
       setCurrentIndex((prevIndex) => (prevIndex === 0 ? generatedVideos.length - 1 : prevIndex - 1));
@@ -19,7 +20,7 @@ const Feed = () => {
           try {
               const response = await getFileUrl('generatedVideos/');
               const shuffledVideos = shuffleArray(response);
-              const selectedVideos = shuffledVideos.slice(0, 10);
+              const selectedVideos = shuffledVideos.slice(0, 30);
               setGeneratedVideos(selectedVideos);
           } catch (error) {
               console.error("Error fetching generated videos:", error);
@@ -28,6 +29,16 @@ const Feed = () => {
 
       fetchGeneratedVideos();
   }, []);
+
+  useEffect(() => {
+      // Ensure the video starts playing when the src changes
+      if (videoRef.current) {
+          videoRef.current.load(); // Reload the video
+          videoRef.current.play().catch((err) => {
+              console.error("Autoplay failed:", err);
+          });
+      }
+  }, [generatedVideos, currentIndex]);
 
   const shuffleArray = (array) => {
     for (let i = array.length - 1; i > 0; i--) {
@@ -38,8 +49,8 @@ const Feed = () => {
 };
 
   return (
-<div className="relative w-full max-w-3xl mx-auto overflow-hidden">
-      <div className="relative flex items-center justify-center h-64">
+<div className="relative w-full max-w-[340px] mx-auto overflow-hidden rounded-2xl">
+      <div className="relative flex items-center justify-center w-[360px] h-[640px]">
         <motion.div
           key={currentIndex}
           initial={{ opacity: 0, x: 50 }}
@@ -48,7 +59,7 @@ const Feed = () => {
           transition={{ duration: 0.5 }}
           className="absolute w-full h-full flex items-center justify-center"
         >
-          <video className="w-full h-full object-cover rounded-2xl shadow-lg" controls autoPlay muted loop alt={`Slide ${currentIndex}`}>
+          <video className="w-full h-full object-cover rounded-2xl shadow-lg" controls autoPlay muted loop alt={`Slide ${currentIndex}`} ref={videoRef}>
                  <source src={generatedVideos[currentIndex]} type="video/mp4"/>
           </video>
         </motion.div>
@@ -65,17 +76,6 @@ const Feed = () => {
       >
         ▶
       </button>
-      <div className="absolute bottom-4 flex justify-center w-full space-x-2">
-        {generatedVideos.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentIndex(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              index === currentIndex ? "bg-gray-800" : "bg-gray-400"
-            }`}
-          />
-        ))}
-      </div>
     </div>
 
 

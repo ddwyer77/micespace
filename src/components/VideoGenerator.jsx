@@ -8,6 +8,7 @@ import VideoDownloader from "./VideoDownloader.jsx";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
+    const [ messageIsCritial, setMessageIsCritial ] = useState(false);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [status, setStatus] = useState("");
@@ -39,13 +40,23 @@ function VideoGenerator() {
             console.error("No file selected");
             return;
         }
+
+   
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > 150) {
+            console.error("File is larger than 150 MB");
+            handleCriticalError("*File must be 150 MB or smaller.");
+            setUploading(false);
+            return;
+        }
+
     
         setVideoFile(file);
         setStatus("");
     
         try {
             // Upload to Firebase
-            handleUpdateStatus("Saving original video...", 0);
+            handleUpdateStatus("Uploading original video...", 0);
             const originalVidUrl = await uploadFile(file, `videos/${file.name}`);
             console.log("Uploaded Video:", originalVidUrl);
     
@@ -62,6 +73,8 @@ function VideoGenerator() {
             handleCriticalError("Failed to process video.");
             setUploading(false);
         }
+
+        
     };
       
     const getFileExtension = (filename) => {
@@ -70,11 +83,13 @@ function VideoGenerator() {
     };
 
     const handleUpdateStatus = (message, progress) =>{
+        setMessageIsCritial(false);
         setStatus(message);
         setProgress(progress);
     }
 
     const handleCriticalError = (message) => {
+        setMessageIsCritial(true);
         setStatus(message);
         setProgress(0);
         setLoading(false);
@@ -212,11 +227,17 @@ function VideoGenerator() {
             setDownloadUrl(mergedVideoUrl);
             handleUpdateStatus("Video generated successfully.", 100);
 
-            try {
-                await uploadGeneratedVideosForFeed(originalVidUrl, trimmedVideoUrl, mergedVideoUrl);
-            } catch (error) {
-                console.error("Error uploading generated videos for feed:", error);
-            }
+            // ********************************************
+            // *     Upload Generated Video To Feed
+            // ********************************************
+            const storagePath = `generatedVideos/video-${Date.now()}.mp4`;
+            uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath)
+                .then((downloadUrl) => {
+                    console.log("Video uploaded to Firebase:", downloadUrl);
+                })
+                .catch((error) => {
+                    console.error("Upload failed:", error);
+                });
 
         } catch (error) {
             console.error("Error generating video:", error.message);
@@ -279,7 +300,7 @@ function VideoGenerator() {
             )}
 
             {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 8 minutes. Please don't close the page.</p>)}
-            {status && <p className="mt-4 text-gray-700">{status}</p>}
+            {status && <p className={`mt-4 ${messageIsCritial ? "text-red-600" : "text-gray-700"}`}>{status}</p>}
 
             {downloadUrl && (
                 <div className="w-full flex flex-col gap-4">
