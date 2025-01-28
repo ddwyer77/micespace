@@ -1,6 +1,6 @@
 // utils/firebaseUtils.js
 import { initializeApp } from "firebase/app";
-import { getStorage, ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "firebase/storage";
 import axios from "axios";
 
 let app;
@@ -47,6 +47,20 @@ export const getFileUrl = async (folderPath) => {
         return urls;
     } catch (error) {
         console.error("Error fetching file URLs:", error);
+        throw error;
+    }
+};
+
+export const deleteFile = async (path) => {
+    try {
+        if (!storage) {
+            await initializeFirebase();
+        }
+        const fileRef = ref(storage, path);
+        await deleteObject(fileRef);
+        console.log("File deleted successfully:", path);
+    } catch (error) {
+        console.error("Error deleting file from Firebase:", error);
         throw error;
     }
 };

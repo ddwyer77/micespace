@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
-import { getFileUrl, uploadFile } from "../utils/storage.js";
+import { getFileUrl, uploadFile, deleteFile } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png'
 import VideoDownloader from "./VideoDownloader.jsx";
@@ -9,6 +9,7 @@ import VideoDownloader from "./VideoDownloader.jsx";
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
     const [ messageIsCritial, setMessageIsCritial ] = useState(false);
+    const [ originalVidUrl, setOriginalVidUrl ] = useState("");
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [status, setStatus] = useState("");
@@ -18,7 +19,6 @@ function VideoGenerator() {
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
     const [ ingestedVideoId, setIngestedVideoId ] = useState("");
-    let originalVidUrl = ""; 
     let ingestedVideoUrl = "";
     let trimmedVideoUrl = "";
     let lastFrameDataUrl = "";
@@ -40,7 +40,6 @@ function VideoGenerator() {
             console.error("No file selected");
             return;
         }
-
    
         const fileSizeMB = file.size / (1024 * 1024);
         if (fileSizeMB > 150) {
@@ -53,16 +52,19 @@ function VideoGenerator() {
     
         setVideoFile(file);
         setStatus("");
+        const sanitizedFileName = file.name.replace(/\s+/g, "_");
+        const fileExtension = getFileExtension(file.name); 
     
         try {
             // Upload to Firebase
             handleUpdateStatus("Uploading original video...", 0);
-            const originalVidUrl = await uploadFile(file, `videos/${file.name}`);
-            console.log("Uploaded Video:", originalVidUrl);
+            const uploadedUrl = await uploadFile(file, `videos/${sanitizedFileName}`);
+            console.log("Uploaded Video:", uploadedUrl);
+            setOriginalVidUrl(uploadedUrl); 
     
             // Compress the uploaded video
             handleUpdateStatus("Compressing video...", 0);
-            const response = await axios.post("/.netlify/functions/compressVideo", { videoUrl: originalVidUrl, type: getFileExtension(file.name) });
+            const response = await axios.post("/.netlify/functions/compressVideo", { videoUrl: uploadedUrl, type: fileExtension });
             console.log("Compression Response:", response.data.data.id);
             setIngestedVideoId(response.data.data.id);
     
@@ -73,11 +75,10 @@ function VideoGenerator() {
             handleCriticalError("Failed to process video.");
             setUploading(false);
         }
-
-        
     };
       
     const getFileExtension = (filename) => {
+        console.log("Extracting file extension for:", filename);
         const match = filename.match(/\.([a-zA-Z0-9]+)$/);
         return match ? match[1].toLowerCase() : '';
     };
@@ -230,7 +231,8 @@ function VideoGenerator() {
             // ********************************************
             // *     Upload Generated Video To Feed
             // ********************************************
-            const storagePath = `generatedVideos/video-${Date.now()}.mp4`;
+            
+            const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
             uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath)
                 .then((downloadUrl) => {
                     console.log("Video uploaded to Firebase:", downloadUrl);
@@ -244,6 +246,21 @@ function VideoGenerator() {
             handleCriticalError("Failed to generate video.");
         } finally {
             setLoading(false);
+
+            // ********************************************
+            // *     Delete Original Video from Firebase
+            // ********************************************
+            try {
+                if (originalVidUrl) {
+                    const filePath = decodeURIComponent(originalVidUrl.split("/o/")[1].split("?")[0]);
+                    await deleteFile(filePath);
+                    console.log("Original video deleted from Firebase.");
+                } else {
+                    console.log("No original video URL available to delete.");
+                }
+            } catch (error) {
+                console.error("Error deleting video from Firebase:", error.message);
+            }
         }
     };
 

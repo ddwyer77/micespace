@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 const Feed = () => {
     const [generatedVideos, setGeneratedVideos] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [isMuted, setIsMuted] = useState(true); 
+    
     const videoRef = useRef(null);
 
     const handlePrev = () => {
@@ -20,7 +22,7 @@ const Feed = () => {
           try {
               const response = await getFileUrl('generatedVideos/');
               const shuffledVideos = shuffleArray(response);
-              const selectedVideos = shuffledVideos.slice(0, 50);
+              const selectedVideos = shuffledVideos.slice(0, 150);
               setGeneratedVideos(selectedVideos);
           } catch (error) {
               console.error("Error fetching generated videos:", error);
@@ -59,7 +61,16 @@ const Feed = () => {
           transition={{ duration: 0.5 }}
           className="absolute w-full h-full flex items-center justify-center"
         >
-          <video className="w-full h-full object-cover rounded-2xl shadow-lg" controls autoPlay muted alt={`Slide ${currentIndex}`} ref={videoRef} onEnded={handleNext}>
+          <video 
+            className="w-full h-full object-cover rounded-2xl shadow-lg" 
+            controls 
+            autoPlay 
+            muted={isMuted} 
+            alt={`Slide ${currentIndex}`} 
+            ref={videoRef} 
+            onEnded={handleNext}
+            onVolumeChange={() => setIsMuted(videoRef.current.muted)}
+          >
                  <source src={generatedVideos[currentIndex]} type="video/mp4"/>
           </video>
         </motion.div>
