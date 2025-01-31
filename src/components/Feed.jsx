@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { getFileUrl } from "../utils/storage.js";
+import { getFileUrl, getCollectionDocs } from "../utils/storage.js";
 import { motion } from "framer-motion";
+import { select } from "framer-motion/client";
+import Loader from "./Loader";
 
 const Feed = () => {
     const [generatedVideos, setGeneratedVideos] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isMuted, setIsMuted] = useState(true); 
+    const [loading, setLoading] = useState(true);
     
     const videoRef = useRef(null);
 
@@ -17,25 +20,27 @@ const Feed = () => {
       setCurrentIndex((prevIndex) => (prevIndex === generatedVideos.length - 1 ? 0 : prevIndex + 1));
     };
 
-    useEffect(() => {
-      const fetchGeneratedVideos = async () => {
-          try {
-              const response = await getFileUrl('generatedVideos/');
-              const shuffledVideos = shuffleArray(response);
-              const selectedVideos = shuffledVideos.slice(0, 150);
-              setGeneratedVideos(selectedVideos);
-          } catch (error) {
-              console.error("Error fetching generated videos:", error);
-          }
-      };
+  useEffect(() => {
+    const fetchVideos = async () => {
+        try {
+            const videos = await getCollectionDocs("videos");
+            const filteredVideos = videos.filter(video => video.inFeed === true && video.isApproved === true);
+            const shuffledVideos = shuffleArray(filteredVideos);
+            const selectedVideos = shuffledVideos.slice(0, 150);
+            setGeneratedVideos(selectedVideos);
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching videos:", error);
+            setLoading(false);
+        }
+    };
 
-      fetchGeneratedVideos();
-  }, []);
+    fetchVideos();
+}, []);
 
   useEffect(() => {
-      // Ensure the video starts playing when the src changes
       if (videoRef.current) {
-          videoRef.current.load(); // Reload the video
+          videoRef.current.load();
           videoRef.current.play().catch((err) => {
               console.error("Autoplay failed:", err);
           });
@@ -49,6 +54,10 @@ const Feed = () => {
     }
     return array;
 };
+
+if (loading) {
+  return <Loader />;
+}
 
   return (
 <div className="relative w-full max-w-[340px] mx-auto overflow-hidden rounded-2xl">
@@ -71,7 +80,7 @@ const Feed = () => {
             onEnded={handleNext}
             onVolumeChange={() => setIsMuted(videoRef.current.muted)}
           >
-                 <source src={generatedVideos[currentIndex]} type="video/mp4"/>
+                 <source src={generatedVideos[currentIndex].url} type="video/mp4"/>
           </video>
         </motion.div>
       </div>

@@ -1,21 +1,28 @@
 import './App.css'
+import React, { Fragment, useEffect, useState } from 'react';
 import VideoGenerator from './components/VideoGenerator'
 import Header from './components/Header';
-import Feed from './components/Feed';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import Admin from './pages/Admin';
+import SignIn from './components/SignIn';
+import { initializeFirebase } from './utils/storage';
 
 function App() {
-
+  useEffect(() => {
+    initializeFirebase();
+}, []);
   return (
-  
-      <div className="flex justify-center items-center w-screen flex-col p-4 mt-24 relative">
-        <Header />
-        <div className="max-w-2xl flex flex-col gap-4">
-          <VideoGenerator />
-          <Feed />
-        </div>
-      </div>
-
-
+  <Router>
+    <Fragment>
+          <Header />
+            <Routes>
+              <Route exact path="/" element={<VideoGenerator />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            </Routes>
+      </Fragment>
+  </Router>
   )
 }
 
