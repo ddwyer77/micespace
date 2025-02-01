@@ -341,14 +341,14 @@ function VideoGenerator() {
                                 View Video
                             </a>
                             <VideoDownloader videoUrl={downloadUrl} fileName="miceband_video.mp4" />
-                            <a
+                            {/* <a
                                 href={`https://www.tiktok.com/share?url=${encodeURIComponent(downloadUrl)}`}
                                 target="_blank"
                                 download
                                 className="block bg-[#23E7E0] text-black hover:text-black hover:bg-[#64fffa] px-4 rounded-lg w-full text-center py-4"
                                 >
                                 Share To TikTok
-                            </a>
+                            </a> */}
                         </div>
                     )}
 
