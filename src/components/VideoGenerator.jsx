@@ -357,7 +357,7 @@ function VideoGenerator() {
                                 fileName="miceband_video.mp4" 
                                 bgColor="bg-[#23E7E0]" 
                                 hoverBgColor="bg-[#64fffa]" 
-                                redirectUrl="https://www.tiktok.com/upload" 
+                                redirectUrl="https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload" 
                                 textColor="text-black"
                                 icon={<TikTokIcon />}
                                 textContent="Share To TikTok"
