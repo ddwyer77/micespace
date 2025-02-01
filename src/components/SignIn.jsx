@@ -37,7 +37,7 @@ const SignIn = () => {
                     onChange={(e) => setPassword(e.target.value)} 
                     className="border p-2"
                 />
-                <button type="submit" className="bg-blue-500 text-white p-2">Sign In</button>
+                <button type="submit" className="bg-primary text-white p-2">Sign In</button>
             </form>
         </div>
     );
