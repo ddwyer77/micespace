@@ -6,6 +6,7 @@ import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.
 import logoSlogan from '../assets/images/logo_slogan.png'
 import VideoDownloader from "./VideoDownloader.jsx";
 import Feed from './Feed';
+import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
@@ -32,6 +33,9 @@ function VideoGenerator() {
 
         return () => clearInterval(interval);
     }, [loading]);
+
+
+
 
     const handleVideoUpload = async (event) => {
         setUploading(true);
@@ -340,18 +344,26 @@ function VideoGenerator() {
                                 >
                                 View Video
                             </a>
-                            <VideoDownloader videoUrl={downloadUrl} fileName="miceband_video.mp4" />
-                            {/* <a
-                                href={`https://www.tiktok.com/share?url=${encodeURIComponent(downloadUrl)}`}
-                                target="_blank"
-                                download
-                                className="block bg-[#23E7E0] text-black hover:text-black hover:bg-[#64fffa] px-4 rounded-lg w-full text-center py-4"
-                                >
-                                Share To TikTok
-                            </a> */}
+                            <VideoDownloader 
+                                videoUrl={downloadUrl} 
+                                fileName="miceband_video.mp4" 
+                                bgColor="bg-gray" 
+                                hoverBgColor="bg-slate-900" 
+                                textColor="text-white"
+                                textContent="Download Video"
+                            />
+                            <VideoDownloader 
+                                videoUrl={downloadUrl} 
+                                fileName="miceband_video.mp4" 
+                                bgColor="bg-[#23E7E0]" 
+                                hoverBgColor="bg-[#64fffa]" 
+                                redirectUrl="https://www.tiktok.com/upload" 
+                                textColor="text-black"
+                                icon={<TikTokIcon />}
+                                textContent="Share To TikTok"
+                            />
                         </div>
                     )}
-
                     <Feed />
                 </div>
             </div>

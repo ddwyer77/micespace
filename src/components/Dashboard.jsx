@@ -23,8 +23,8 @@ const Dashboard = () => {
         <div className="h-screen">
             <h1 className="w-full text-center mt-6">Dashboard</h1>
             <div>
-                {dataComponents.map((item) => (
-                    <div className="w-full flex justify-center">
+                {dataComponents.map((item, index) => (
+                    <div key={index} className="w-full flex justify-center">
                         {item}
                     </div>
                 ))}

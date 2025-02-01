@@ -1,6 +1,6 @@
 import React from "react";
 
-const VideoDownloader = ({ videoUrl, fileName = "miceband_video.mp4" }) => {
+const VideoDownloader = ({ videoUrl, fileName = "miceband_video.mp4", bgColor, hoverBgColor, textColor, textContent, redirectUrl = null, icon = null }) => {
   const downloadVideo = async () => {
     try {
       // Fetch the video file
@@ -25,6 +25,10 @@ const VideoDownloader = ({ videoUrl, fileName = "miceband_video.mp4" }) => {
       // Cleanup
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
+
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      }
     } catch (error) {
       console.error("Error downloading the video:", error);
       alert("Failed to download the video. Please try again.");
@@ -34,9 +38,10 @@ const VideoDownloader = ({ videoUrl, fileName = "miceband_video.mp4" }) => {
   return (
     <button
       onClick={downloadVideo}
-      className="block bg-gray text-white border-none hover:text-white hover:bg-slate-900 px-4 rounded-lg w-full text-center py-4"
+      className={`flex justify-center items-center ${bgColor} ${textColor} border-none hover:text-white hover:${hoverBgColor} px-4 rounded-lg w-full text-center py-4`}
     >
-      Download Video
+      {icon}
+      <span>{textContent}</span>
     </button>
   );
 };
