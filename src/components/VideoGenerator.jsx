@@ -7,6 +7,8 @@ import logoSlogan from '../assets/images/logo_slogan.png'
 import VideoDownloader from "./VideoDownloader.jsx";
 import Feed from './Feed';
 import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
+import Modal from "./Modal.jsx";
+import TermsOfService from "./TermsOfService.jsx";
 
 function VideoGenerator() {
     const [videoFile, setVideoFile] = useState(null);
@@ -21,6 +23,9 @@ function VideoGenerator() {
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
     const [ ingestedVideoId, setIngestedVideoId ] = useState("");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [ hasAcceptedTerms, setHasAcceptedTerms ] = useState(false);
+    const [ showError, setShowError ] = useState(false);
     let ingestedVideoUrl = "";
     let trimmedVideoUrl = "";
     let lastFrameDataUrl = "";
@@ -101,6 +106,11 @@ function VideoGenerator() {
         setLoading(false);
     }
 
+    const handleCheckboxChange = (event) => {
+        setHasAcceptedTerms(event.target.checked);
+    };
+
+
     const pollTaskStatus = async (task_id) => {
         try {
             let status = "Queueing";
@@ -154,6 +164,14 @@ function VideoGenerator() {
     const handleGenerateVideo = async () => {
         if (!videoFile) {
             handleUpdateStatus("Please upload a video file.", 0);
+            return;
+        }
+
+        if (!hasAcceptedTerms) {
+            setShowError(true);
+            setTimeout(() => {
+                setShowError(false);
+            }, 5000);
             return;
         }
 
@@ -290,6 +308,21 @@ function VideoGenerator() {
                         onChange={handleVideoUpload}
                         className="block w-full mt-2 border rounded-lg p-2"
                     />
+                    {showError && <strong className="mt-4 text-red-600">Please accept the terms of service.</strong>}
+                    <div>
+                        <input type="checkbox" onChange={handleCheckboxChange} id="terms" name="terms" value="terms" className="mr-2 hover:cursor-pointer"/>
+                        <label htmlFor="terms" className="text-gray-700">By generating a video, you agree to our <a className="hover:cursor-pointer" onClick={()=>setIsModalOpen(true)}>Terms of Service </a>and confirm that you have the rights to use any uploaded content. Videos must comply with all applicable laws and our content guidelines.</label>
+                    </div>
+
+                    <Modal
+                        isOpen={isModalOpen}
+                        onClose={() => setIsModalOpen(false)}
+                    >
+                        <TermsOfService />
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setIsModalOpen(false)} className="bg-gray-500 text-white px-4 py-2 rounded mr-2">Ok</button>
+                        </div>
+                    </Modal>
 
                     {(uploading || loading) ? (
                         <button
@@ -357,7 +390,7 @@ function VideoGenerator() {
                                 fileName="miceband_video.mp4" 
                                 bgColor="bg-[#23E7E0]" 
                                 hoverBgColor="bg-[#64fffa]" 
-                                redirectUrl="https://www.tiktok.com/upload" 
+                                redirectUrl="https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload" 
                                 textColor="text-black"
                                 icon={<TikTokIcon />}
                                 textContent="Share To TikTok"
