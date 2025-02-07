@@ -392,7 +392,7 @@ function VideoGenerator() {
                             )}
 
                             <button
-                                className={`px-4 py-2 rounded mt-4 block text-center w-full ${
+                                className={`px-4 py-2 rounded mt-4 block text-center w-full max-w-80 ${
                                     downloadUrl
                                         ? "bg-blue-600 text-white" // ✅ Download button when ready
                                         : "bg-green-600 text-white" // ✅ Retrieve button before merging
@@ -410,6 +410,13 @@ function VideoGenerator() {
                                 disabled={isMerging}
                             >
                                 {downloadUrl ? "Download Video" : isMerging ? "Retrieving Video..." : "Retrieve Video"}
+                            </button>
+                            <button onClick={()=>{
+                                    localStorage.removeItem("currentVideoInProgress")
+                                    setIsPendingVideoModalOpen(false)
+                                }} 
+                                className="bg-gray-300 px-4 py-2 rounded mt-4 block text-center w-full max-w-80">
+                                Discard
                             </button>
                         </div>
                     </Modal>
