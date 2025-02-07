@@ -7,6 +7,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Admin from './pages/Admin';
 import SignIn from './components/SignIn';
 import { initializeFirebase } from './utils/storage';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   useEffect(() => {
@@ -16,6 +18,7 @@ function App() {
   <Router>
     <Fragment>
           <Header />
+          <ToastContainer position="top-left" autoClose={6000} />
             <Routes>
               <Route exact path="/" element={<VideoGenerator />} />
               <Route path="/signin" element={<SignIn />} />

@@ -9,28 +9,32 @@ import Feed from './Feed';
 import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
 import Modal from "./Modal.jsx";
 import TermsOfService from "./TermsOfService.jsx";
+import { toast } from "react-toastify";
 
 function VideoGenerator() {
-    const [videoFile, setVideoFile] = useState(null);
+    const [ videoFile, setVideoFile ] = useState(null);
     const [ messageIsCritial, setMessageIsCritial ] = useState(false);
     const [ originalVidUrl, setOriginalVidUrl ] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [status, setStatus] = useState("");
-    const [downloadUrl, setDownloadUrl] = useState("");
-    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-    const [progress, setProgress] = useState(0); 
+    const [ loading, setLoading ] = useState(false);
+    const [ uploading, setUploading ] = useState(false);
+    const [ status, setStatus ] = useState("");
+    const [ downloadUrl, setDownloadUrl ] = useState("");
+    const [ loadingMessageIndex, setLoadingMessageIndex ] = useState(0);
+    const [ progress, setProgress ] = useState(0); 
     const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const clipLength = 5;
     const [ ingestedVideoId, setIngestedVideoId ] = useState("");
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [ isModalOpen, setIsModalOpen ] = useState(false);
+    const [ isPendingVideoModalOpen, setIsPendingVideoModalOpen ] = useState(false);
     const [ hasAcceptedTerms, setHasAcceptedTerms ] = useState(false);
     const [ showError, setShowError ] = useState(false);
+    const [ currentVideoInProgressData, setCurrentVideoInProgressData ] = useState(null);
+    const [isMerging, setIsMerging] = useState(false); 
     let ingestedVideoUrl = "";
     let trimmedVideoUrl = "";
     let lastFrameDataUrl = "";
 
-    useEffect(() => {        
+    useEffect(() => {     
         if (!loading) return;
         const interval = setInterval(() => {
         setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % loadingMessages.length);
@@ -39,8 +43,31 @@ function VideoGenerator() {
         return () => clearInterval(interval);
     }, [loading]);
 
-
-
+    useEffect(() => {
+        const storedData = localStorage.getItem("currentVideoInProgress");
+    
+        if (storedData) {
+            try {
+                const parsedData = JSON.parse(storedData);
+                if (
+                    parsedData &&
+                    typeof parsedData === "object" &&
+                    parsedData.task_id &&
+                    parsedData.trimmed_video_url &&
+                    parsedData.task_id.trim() !== "" &&
+                    parsedData.trimmed_video_url.trim() !== ""
+                ) {
+                    setCurrentVideoInProgressData(parsedData);
+                    setIsPendingVideoModalOpen(true);
+                } else {
+                    console.warn("Invalid data structure in localStorage:", parsedData);
+                    localStorage.removeItem("currentVideoInProgress"); // Clear invalid data
+                }
+            } catch (error) {
+                localStorage.removeItem("currentVideoInProgress"); // Remove invalid entry
+            }
+        }
+    }, []);
 
     const handleVideoUpload = async (event) => {
         setUploading(true);
@@ -110,7 +137,6 @@ function VideoGenerator() {
         setHasAcceptedTerms(event.target.checked);
     };
 
-
     const pollTaskStatus = async (task_id) => {
         try {
             let status = "Queueing";
@@ -147,7 +173,6 @@ function VideoGenerator() {
                 });
                 const rendition = response.data.attributes.outputs.renditions[0];
                 if (rendition && rendition.url) {
-                    console.log("Ingested Video URL:", rendition.url);
                     return rendition.url;
                 }
             } catch (error) {
@@ -160,6 +185,49 @@ function VideoGenerator() {
     
         throw new Error("Ingested video is not ready after maximum retries.");
     };
+
+    async function mergeVideos(trimmedVideoUrl, task_id) {
+        setIsMerging(true);
+        const generatedVideoUrl = await pollTaskStatus(task_id);
+        console.log("Generated Video URL:", generatedVideoUrl);
+    
+        // Proceed to merge the videos
+        const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
+        const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
+            videoUrls,
+            audioUrl,
+            clipLength,
+        });
+    
+        const mergedVideoUrl = mergeResponse.data.renderUrl;
+        console.log("Merged Video URL:", mergedVideoUrl);
+    
+        setDownloadUrl(mergedVideoUrl);
+        await uploadAndSaveVideo(mergedVideoUrl)
+        handleUpdateStatus("Video generated successfully.", 100);
+        localStorage.removeItem("currentVideoInProgress");
+        setIsMerging(false);
+    }
+
+    async function uploadAndSaveVideo(mergedVideoUrl) {
+        const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
+        const videoTitle = storagePath.split('/').pop().split('.')[0];
+    
+        try {
+            // 1️⃣ Upload video and get the download URL
+            const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
+            console.log("✅ Video uploaded to Firebase:", downloadUrl);
+    
+            // 2️⃣ Save video metadata to database
+            const newDocId = await addDocument("videos", downloadUrl, videoTitle);
+            console.log("✅ New item added:", newDocId);
+    
+            return downloadUrl; // Return for further use if needed
+        } catch (err) {
+            console.error("❌ Error uploading or saving video:", err);
+            throw err; // Propagate error if necessary
+        }
+    }
 
     const handleGenerateVideo = async () => {
         if (!videoFile) {
@@ -232,49 +300,43 @@ function VideoGenerator() {
             });
 
             const { task_id } = response.data;
+            localStorage.setItem("currentVideoInProgress", JSON.stringify({"task_id": task_id, "trimmed_video_url": trimmedVideoUrl}));
+            toast.success("Your video is still generating. Progress saved. Please continue to wait...");
             console.log("Task ID:", task_id);
 
-            const generatedVideoUrl = await pollTaskStatus(task_id);
-            console.log("Generated Video URL:", generatedVideoUrl);
-
-            // Proceed to merge the videos
-            const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
-            const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
-                videoUrls,
-                audioUrl,
-                clipLength,
-            });
-
-            const mergedVideoUrl = mergeResponse.data.renderUrl;
-            console.log("Merged Video URL:", mergedVideoUrl);
-
-            setDownloadUrl(mergedVideoUrl);
-            handleUpdateStatus("Video generated successfully.", 100);
+            try {
+                await mergeVideos(trimmedVideoUrl, task_id);
+            } catch (error) {
+                console.error("❌ Error during video merge:", error);
+                handleCriticalError("Failed to merge video.");
+                throw error;
+            }
 
             // ********************************************
             // *     Upload Generated Video To Storage Bucket
             // ********************************************
             
-            const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
-            const videoTitle = storagePath.split('/').pop().split('.')[0];
-            try {
-                // 1. Upload video and await the download URL
-                const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
-                console.log("Video uploaded to Firebase:", downloadUrl);
+            // const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
+            // const videoTitle = storagePath.split('/').pop().split('.')[0];
+            // try {
+            //     // 1. Upload video and await the download URL
+            //     const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
+            //     console.log("Video uploaded to Firebase:", downloadUrl);
               
-                // ********************************************
-                // *     Save Video Data
-                // ********************************************
-                const newDocId = await addDocument("videos", downloadUrl, title);
-                console.log("New doc added with ID:", newDocId);
+            //     // ********************************************
+            //     // *     Save Video Data
+            //     // ********************************************
+            //     const newDocId = await addDocument("videos", downloadUrl, title);
+            //     console.log("New item added: ", newDocId);
               
-              } catch (err) {
-                console.error("Error uploading or creating new doc:", err);
-              }
+            // } catch (err) {
+            //     console.error("Error uploading or creating new doc:", err);
+            // }
 
         } catch (error) {
             console.error("Error generating video:", error.message);
             handleCriticalError("Failed to generate video.");
+            document.write("Error generating video:", error.message);
         } finally {
             setLoading(false);
 
@@ -301,7 +363,6 @@ function VideoGenerator() {
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
                     <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
-
                     <input
                         type="file"
                         accept="video/*"
@@ -313,7 +374,45 @@ function VideoGenerator() {
                         <input type="checkbox" onChange={handleCheckboxChange} id="terms" name="terms" value="terms" className="mr-2 hover:cursor-pointer"/>
                         <label htmlFor="terms" className="text-gray-700">By generating a video, you agree to our <a className="hover:cursor-pointer" onClick={()=>setIsModalOpen(true)}>Terms of Service </a>and confirm that you have the rights to use any uploaded content. Videos must comply with all applicable laws and our content guidelines.</label>
                     </div>
+                    <Modal isOpen={isPendingVideoModalOpen} onClose={() => setIsPendingVideoModalOpen(false)}>
+                        <div className="flex flex-col items-center">
+                            <h2>Pending video</h2>
+                            <p>It looks like you may have had a video processing.</p>
+                            {(!downloadUrl && isMerging) && (
+                                <div>
+                                    <div className="loading">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </div>
+                                    <span>This could take up to 5 minutes.</span>
+                                </div>
+                            )}
 
+                            <button
+                                className={`px-4 py-2 rounded mt-4 block text-center w-full ${
+                                    downloadUrl
+                                        ? "bg-blue-600 text-white" // ✅ Download button when ready
+                                        : "bg-green-600 text-white" // ✅ Retrieve button before merging
+                                }`}
+                                onClick={async () => {
+                                    if (!downloadUrl && currentVideoInProgressData) {
+                                        await mergeVideos(
+                                            currentVideoInProgressData.trimmed_video_url,
+                                            currentVideoInProgressData.task_id
+                                        );
+                                    } else {
+                                        window.open(downloadUrl, "_blank");
+                                    }
+                                }}
+                                disabled={isMerging}
+                            >
+                                {downloadUrl ? "Download Video" : isMerging ? "Retrieving Video..." : "Retrieve Video"}
+                            </button>
+                        </div>
+                    </Modal>
                     <Modal
                         isOpen={isModalOpen}
                         onClose={() => setIsModalOpen(false)}

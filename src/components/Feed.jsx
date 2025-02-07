@@ -3,6 +3,7 @@ import { getFileUrl, getCollectionDocs } from "../utils/storage.js";
 import { motion } from "framer-motion";
 import { select } from "framer-motion/client";
 import Loader from "./Loader";
+import ThumbsUpIcon from "../assets/icons/ThumbsUpIcon.jsx";
 
 const Feed = () => {
     const [generatedVideos, setGeneratedVideos] = useState([]);
@@ -60,7 +61,7 @@ if (loading) {
 }
 
   return (
-<div className="relative w-full max-w-[340px] mx-auto overflow-hidden rounded-2xl">
+    <div className="relative w-full max-w-[340px] mx-auto overflow-hidden rounded-2xl">
       <div className="relative flex items-center justify-center w-[360px] h-[640px]">
         <motion.div
           key={currentIndex}
@@ -96,6 +97,10 @@ if (loading) {
       >
         ▶
       </button>
+      <div className="absolute z-1 top-0 text-white p-3 hover:cursor-pointer hover:text-primary">
+        <ThumbsUpIcon/>
+        <span>Like</span>
+      </div>
     </div>
 
 
