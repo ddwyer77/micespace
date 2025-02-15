@@ -136,7 +136,7 @@ export const deleteDocument = async (docId) => {
     }
 };
 
-export const addDocument = async (collectionPath, url, title) => {
+export const addDocument = async (collectionPath, url, title, generationType) => {
     try {
       const { firestore } = await initializeFirebase();
   
@@ -152,7 +152,8 @@ export const addDocument = async (collectionPath, url, title) => {
         inFeed: false,
         isApproved: false,
         createdAt: new Date().toISOString(),
-        ownerId: null
+        ownerId: null,
+        generationType
       };
   
       // Set the doc with the generated ID

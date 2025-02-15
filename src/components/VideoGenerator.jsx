@@ -3,13 +3,17 @@ import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
 import { getFileUrl, uploadFile, deleteFile, addDocument } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
-import logoSlogan from '../assets/images/logo_slogan.png'
+import logoSlogan from '../assets/images/logo_slogan.png';
+import MarvinCheese from '../assets/images/marvin_cheese.jpeg';
+import TuffestBear from '../assets/images/tuffest_bear.jpeg';
+import MiceBandOriginal from '../assets/images/mice_band_original.jpeg';
 import VideoDownloader from "./VideoDownloader.jsx";
 import Feed from './Feed';
 import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
 import Modal from "./Modal.jsx";
 import TermsOfService from "./TermsOfService.jsx";
 import { toast } from "react-toastify";
+import Card from "./Card.jsx";
 
 function VideoGenerator() {
     const [ videoFile, setVideoFile ] = useState(null);
@@ -21,7 +25,18 @@ function VideoGenerator() {
     const [ downloadUrl, setDownloadUrl ] = useState("");
     const [ loadingMessageIndex, setLoadingMessageIndex ] = useState(0);
     const [ progress, setProgress ] = useState(0); 
-    const audioUrl = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
+    const audioUrlMiceBandOriginal = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
+    const audioUrlMarvinCheese = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fthe%20moon%20is%20hollow%20snippet.mp3?alt=media&token=735a7bac-af09-4aca-8fdf-1c08a3c0bb6c";
+    const audioUrlTuffestBear = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fdavidthetragic%20new%20body%20snippet.mp3?alt=media&token=8e14a1fc-59b3-41c7-97b2-b3f245a8262d";
+    const promptMiceBandOriginal = "The Camera smoothly pans without delay over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.";
+    const promptMarvinCheese = "The camera pans over and there is a mouse man in an orange jumpsuit sitting on a stool and playing an acoustic guitar and singing.";
+    const promptTuffestBear = "Camera zooms out and a cool rapper bear comes into the frame. He is wearing a flat bill hat and a obnoxious amount of rapper jewelry (big diamond chains and many diamond watches and big rings with diamonds on his fingers) he puts his hand on his shoulder and starts rapping.";
+    const generationTypes = ["mice_band_original", "marvin_cheese", "tuffest_bear"];
+    const [ generationData, setGenerationData ] = useState({
+        audioUrl: audioUrlMiceBandOriginal,
+        prompt: promptMiceBandOriginal,
+        generationType: "mice_band_original"
+    });
     const clipLength = 5;
     const [ ingestedVideoId, setIngestedVideoId ] = useState("");
     const [ isModalOpen, setIsModalOpen ] = useState(false);
@@ -164,6 +179,16 @@ function VideoGenerator() {
         }
     };
 
+    const handleSelectContent = (audioUrl, prompt, generationType) => {
+        setGenerationData((prevData) => ({
+            ...prevData,
+            audioUrl: audioUrl,
+            prompt: prompt,
+            generationType: generationType
+        }));
+    };
+    
+
     const pollIngestedVideo = async (videoId, maxRetries = 30, delay = 5000) => {
         let retries = 0;
         while (retries < maxRetries) {
@@ -195,7 +220,7 @@ function VideoGenerator() {
         const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
         const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
             videoUrls,
-            audioUrl,
+            audioUrl: generationData.audioUrl,
             clipLength,
         });
     
@@ -219,7 +244,7 @@ function VideoGenerator() {
             console.log("✅ Video uploaded to Firebase:", downloadUrl);
     
             // 2️⃣ Save video metadata to database
-            const newDocId = await addDocument("videos", downloadUrl, videoTitle);
+            const newDocId = await addDocument("videos", downloadUrl, videoTitle, generationData.generationType);
             console.log("✅ New item added:", newDocId);
     
             return downloadUrl; // Return for further use if needed
@@ -232,6 +257,7 @@ function VideoGenerator() {
     const handleGenerateVideo = async () => {
         if (!videoFile) {
             handleUpdateStatus("Please upload a video file.", 0);
+            toast.error("Please upload a video to start your generation.");
             return;
         }
 
@@ -295,7 +321,7 @@ function VideoGenerator() {
             handleUpdateStatus("Generating Mice Video...", 40);
             const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
                 model: "video-01",
-                prompt: "The Camera smoothly pans without delay over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.",
+                prompt: generationData.prompt,
                 first_frame_image: lastFrameDataUrl,
             });
 
@@ -312,27 +338,6 @@ function VideoGenerator() {
                 throw error;
             }
 
-            // ********************************************
-            // *     Upload Generated Video To Storage Bucket
-            // ********************************************
-            
-            // const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
-            // const videoTitle = storagePath.split('/').pop().split('.')[0];
-            // try {
-            //     // 1. Upload video and await the download URL
-            //     const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
-            //     console.log("Video uploaded to Firebase:", downloadUrl);
-              
-            //     // ********************************************
-            //     // *     Save Video Data
-            //     // ********************************************
-            //     const newDocId = await addDocument("videos", downloadUrl, title);
-            //     console.log("New item added: ", newDocId);
-              
-            // } catch (err) {
-            //     console.error("Error uploading or creating new doc:", err);
-            // }
-
         } catch (error) {
             console.error("Error generating video:", error.message);
             handleCriticalError("Failed to generate video.");
@@ -341,7 +346,7 @@ function VideoGenerator() {
             setLoading(false);
 
             // ********************************************
-            // *     Delete Original Video from Firebase
+            // *     Delete Original Video
             // ********************************************
             try {
                 if (originalVidUrl) {
@@ -362,25 +367,81 @@ function VideoGenerator() {
             <div className="max-w-2xl flex flex-col gap-4">
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
-                    <h2 className="text-lg font-bold">Your Mice Band Video Generator</h2>
-                    <input
-                        type="file"
-                        accept="video/*"
-                        onChange={handleVideoUpload}
-                        className="block w-full mt-2 border rounded-lg p-2"
-                    />
-                    {showError && <strong className="mt-4 text-red-600">Please accept the terms of service.</strong>}
-                    <div>
-                        <input type="checkbox" onChange={handleCheckboxChange} id="terms" name="terms" value="terms" className="mr-2 hover:cursor-pointer"/>
-                        <label htmlFor="terms" className="text-gray-700">By generating a video, you agree to our <a className="hover:cursor-pointer" onClick={()=>setIsModalOpen(true)}>Terms of Service </a>and confirm that you have the rights to use any uploaded content. Videos must comply with all applicable laws and our content guidelines.</label>
+
+                    {/* ***** Upload ***** */}
+                    <div className="w-full">
+                        <h3 className="text-2xl font-bold w-full text-start mb-2">Upload a video</h3>
+                        <input
+                            type="file"
+                            accept="video/*"
+                            onChange={handleVideoUpload}
+                            className="block w-full mt-2 border rounded-lg p-2"
+                        />
                     </div>
+
+                    {/* ***** Select Content ***** */}
+                    <div>
+                        <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
+                        <div className="flex gap-4">
+                        <Card 
+                            onClick={() => handleSelectContent(audioUrlMiceBandOriginal, promptMiceBandOriginal, generationTypes[0])} 
+                            imageUrl={MiceBandOriginal} 
+                            name="Mice Band Original" 
+                            isSelected={generationData.generationType === generationTypes[0]} 
+                            loading={loading}
+                        />
+
+                        <Card 
+                            onClick={() => handleSelectContent(audioUrlMarvinCheese, promptMarvinCheese, generationTypes[1])} 
+                            imageUrl={MarvinCheese} 
+                            name="Marvin Cheese" 
+                            isSelected={generationData.generationType === generationTypes[1]} 
+                            loading={loading}
+                        />
+
+                        <Card 
+                            onClick={() => handleSelectContent(audioUrlTuffestBear, promptTuffestBear, generationTypes[2])} 
+                            imageUrl={TuffestBear} 
+                            name="Tuffest Bear" 
+                            isSelected={generationData.generationType === generationTypes[2]} 
+                            loading={loading}
+                        />
+                        </div>
+                    </div>
+
+                    {showError && <strong className="mt-4 text-red-600">Please accept the terms of service.</strong>}
+
+                    {/* ***** Generate ***** */}
+                    <div className="w-full">
+                        <h3 className="text-2xl font-bold w-full text-start mb-2">Generate video</h3>
+                        {(uploading || loading) ? (
+                            <button
+                                disabled
+                                className="bg-gray-200 text-white py-4 rounded-lg w-full border-none"
+                            >
+                                Loading...
+                            </button>
+                            ) : (
+                            <button
+                                onClick={handleGenerateVideo}
+                                disabled={loading}
+                                className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg w-full border-none"
+                                style={{
+                                cursor: loading ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                {loading ? "Processing..." : "Generate Video"}
+                            </button>
+                        )}
+                    </div>
+
                     <Modal isOpen={isPendingVideoModalOpen} onClose={() => setIsPendingVideoModalOpen(false)}>
                         <div className="flex flex-col items-center">
                             <h2>Pending video</h2>
                             <p>It looks like you may have had a video processing.</p>
                             {(!downloadUrl && isMerging) && (
                                 <div>
-                                    <div className="loading">
+                                    <div className="loading mx-auto">
                                         <span></span>
                                         <span></span>
                                         <span></span>
@@ -420,6 +481,7 @@ function VideoGenerator() {
                             </button>
                         </div>
                     </Modal>
+
                     <Modal
                         isOpen={isModalOpen}
                         onClose={() => setIsModalOpen(false)}
@@ -430,29 +492,14 @@ function VideoGenerator() {
                         </div>
                     </Modal>
 
-                    {(uploading || loading) ? (
-                        <button
-                            disabled
-                            className="bg-gray-200 text-white py-4 rounded-lg mt-4 w-full border-none"
-                        >
-                            Loading...
-                        </button>
-                        ) : (
-                        <button
-                            onClick={handleGenerateVideo}
-                            disabled={loading || !videoFile}
-                            className="bg-primary text-white py-4 hover:bg-primary-dark rounded-lg mt-4 w-full border-none"
-                            style={{
-                            cursor: loading ? "not-allowed" : "pointer",
-                            }}
-                        >
-                            {loading ? "Processing..." : "Generate Video"}
-                        </button>
-                    )}
+                    <div>
+                        <input type="checkbox" onChange={handleCheckboxChange} id="terms" name="terms" value="terms" className="mr-2 hover:cursor-pointer"/>
+                        <label htmlFor="terms" className="text-gray-700">By generating a video, you agree to our <a className="hover:cursor-pointer" onClick={()=>setIsModalOpen(true)}>Terms of Service </a>and confirm that you have the rights to use any uploaded content. Videos must comply with all applicable laws and our content guidelines.</label>
+                    </div>
                     
 
                     {loading && (
-                        <div className="mt-4 justify-center flex flex-col items-center w-full">
+                        <div className="justify-center flex flex-col items-center w-full">
                             <div className="loading">
                                 <span></span>
                                 <span></span>
