@@ -52,7 +52,7 @@ function VideoGenerator() {
     useEffect(() => {     
         if (!loading) return;
         const interval = setInterval(() => {
-        setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % loadingMessages.length);
+        setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % loadingMessages[generationData.generationType].length);
         }, 2000);
 
         return () => clearInterval(interval);
@@ -513,7 +513,7 @@ function VideoGenerator() {
                                 style={{ width: `${progress}%` }}
                                 ></div>
                             </div>
-                            <p>{loadingMessages[loadingMessageIndex]}</p>
+                            <p>{loadingMessages[generationData.generationType][loadingMessageIndex]}</p>
                         </div>
                     )}
 
