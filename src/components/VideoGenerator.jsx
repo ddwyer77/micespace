@@ -24,13 +24,15 @@ function VideoGenerator() {
     const [ status, setStatus ] = useState("");
     const [ downloadUrl, setDownloadUrl ] = useState("");
     const [ loadingMessageIndex, setLoadingMessageIndex ] = useState(0);
-    const [ progress, setProgress ] = useState(0); 
+    const [ progress, setProgress ] = useState(0);
+    const [ isRedirectError, setIsRedirectError ] = useState(false);
     const audioUrlMiceBandOriginal = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const audioUrlMarvinCheese = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fthe%20moon%20is%20hollow%20snippet.mp3?alt=media&token=735a7bac-af09-4aca-8fdf-1c08a3c0bb6c";
     const audioUrlTuffestBear = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fdavidthetragic%20new%20body%20snippet.mp3?alt=media&token=8e14a1fc-59b3-41c7-97b2-b3f245a8262d";
     const promptMiceBandOriginal = "The Camera smoothly pans without delay over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.";
     const promptMarvinCheese = "The camera pans over and there is a mouse man in an orange jumpsuit sitting on a stool and playing an acoustic guitar and singing.";
     const promptTuffestBear = "Camera zooms out and a cool rapper bear comes into the frame. He is wearing a flat bill hat and a obnoxious amount of rapper jewelry (big diamond chains and many diamond watches and big rings with diamonds on his fingers) he puts his hand on his shoulder and starts rapping.";
+    const promptSecondTuffestBear = "A cool rapper bear is rapping with a lot of enthusiasm jumping up and down and really giving it his all.";
     const generationTypes = ["mice_band_original", "marvin_cheese", "tuffest_bear"];
     const [ generationData, setGenerationData ] = useState({
         audioUrl: audioUrlMiceBandOriginal,
@@ -45,9 +47,6 @@ function VideoGenerator() {
     const [ showError, setShowError ] = useState(false);
     const [ currentVideoInProgressData, setCurrentVideoInProgressData ] = useState(null);
     const [isMerging, setIsMerging] = useState(false); 
-    let ingestedVideoUrl = "";
-    let trimmedVideoUrl = "";
-    let lastFrameDataUrl = "";
 
     useEffect(() => {     
         if (!loading) return;
@@ -100,7 +99,6 @@ function VideoGenerator() {
             setUploading(false);
             return;
         }
-
     
         setVideoFile(file);
         setStatus("");
@@ -146,6 +144,7 @@ function VideoGenerator() {
         setStatus(message);
         setProgress(0);
         setLoading(false);
+        setIsRedirectError(true);
     }
 
     const handleCheckboxChange = (event) => {
@@ -217,11 +216,23 @@ function VideoGenerator() {
         console.log("Generated Video URL:", generatedVideoUrl);
     
         // Proceed to merge the videos
-        const videoUrls = [trimmedVideoUrl, generatedVideoUrl];
+        let videoUrls = [trimmedVideoUrl, generatedVideoUrl];
+        let audioLength = 5;
+
+        // TODO - Check alternative prompt works
+        // TODO - breakpoint at generatedVideoUrls and make sure they are correct
+
+        if (generationData.generationType === "tuffest_bear") {
+            generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
+            videoUrls = [trimmedVideoUrl, ...generatedVideoUrls];
+            audioLength = 10;
+        }
+
         const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
             videoUrls,
             audioUrl: generationData.audioUrl,
             clipLength,
+            audioLength: audioLength
         });
     
         const mergedVideoUrl = mergeResponse.data.renderUrl;
@@ -254,6 +265,82 @@ function VideoGenerator() {
         }
     }
 
+    async function getIngestedVideoUrl(ingestedVideoId) {
+        try {
+            const ingestedVideoUrl = await pollIngestedVideo(ingestedVideoId);
+            if (!ingestedVideoUrl) {
+                throw new Error("Failed to retrieve ingested video URL.");
+            }
+            console.log("Ingested Video Url:", ingestedVideoUrl);
+            return ingestedVideoUrl;
+        } catch (error) {
+            console.error("Error getting ingested video:", error.message);
+            handleCriticalError("Failed to get ingested video URL.");
+            throw error;
+        }
+    }
+    
+
+    async function getLastFrame(trimmedVideoUrl) {
+        try {
+            const response = await axios.post("/.netlify/functions/getLastFrame", {
+                trimmedVideoUrl,
+                clipLength,
+            });
+            const lastFrameDataUrl = response.data.renderUrl;
+            console.log("Last Frame:", lastFrameDataUrl);
+            return lastFrameDataUrl;
+        } catch (error) {
+            console.error("Error fetching last frame:", error);
+            handleCriticalError("Failed to fetch last frame.");
+            throw error;
+        }
+    }
+
+    async function trimVideo(ingestedVideoUrl) {
+        try {
+            handleUpdateStatus("Trimming video...", 20);
+            const response = await axios.post("/.netlify/functions/trimVideo", {
+              videoUrl: ingestedVideoUrl,
+              clipLength
+            });
+            const trimmedVideoUrl = response.data.trimmedVideoUrl;
+            console.log("Trimmed Video:", trimmedVideoUrl);
+            return trimmedVideoUrl;
+        } catch (error) {
+            console.error(error);
+            handleCriticalError("Failed to trim video.");
+            return;
+        }
+    }
+
+    async function getAiGeneratedVideoTaskId(lastFrameDataUrl, alternatePrompt = null) {
+        const prompt = alternatePrompt ? alternatePrompt : generationData.prompt;
+        try {
+            handleUpdateStatus("Generating Mice Video...", 40);
+            const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
+                model: "video-01",
+                prompt: prompt,
+                first_frame_image: lastFrameDataUrl,
+            });
+            return response.data;
+        } catch (error) {
+            console.error(error);
+            handleCriticalError("Failed create AI generation task.");
+            return;
+        }
+
+    }
+
+    async function getDoubleVideoGeneration(firstGeneratedVideo) {
+        const lastFrame = await getLastFrame(firstGeneratedVideo);
+        const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, promptSecondTuffestBear);
+        const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
+        const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
+        // add second prompt to new ai generation
+        return videoUrls;
+    }
+
     const handleGenerateVideo = async () => {
         if (!videoFile) {
             handleUpdateStatus("Please upload a video file.", 0);
@@ -276,56 +363,28 @@ function VideoGenerator() {
             // ********************************************
             // *     Get Ingested Video
             // ********************************************
-            try {
-                ingestedVideoUrl = await pollIngestedVideo(ingestedVideoId);
-                console.log("Ingested Video Url:", ingestedVideoUrl);
-            } catch (error) {
-                console.error("Error getting ingested video:", error.message);
-            }
+            const ingestedVideoUrl = await getIngestedVideoUrl(ingestedVideoId);
 
             // ********************************************
             // *     Trim Video To 5 Seconds
             // ********************************************
-            try {
-                handleUpdateStatus("Trimming video...", 20);
-                const response = await axios.post("/.netlify/functions/trimVideo", {
-                  videoUrl: ingestedVideoUrl,
-                  clipLength
-                });
-                trimmedVideoUrl = response.data.trimmedVideoUrl;
-                console.log("Trimmed Video:", trimmedVideoUrl);
-            } catch (error) {
-                console.error(error);
-                handleCriticalError("Failed to trim video.");
-                return;
-            }
+            const trimmedVideoUrl = await trimVideo(ingestedVideoUrl);
+
             // ********************************************
-            // *     Fetch Last Frame
+            // *     Get Last Frame
             // ********************************************
-            try {
-                const response = await axios.post("/.netlify/functions/getLastFrame", {
-                    trimmedVideoUrl,
-                    clipLength,
-                });
-                lastFrameDataUrl = response.data.renderUrl;
-                console.log("Last Frame:", lastFrameDataUrl);
-            } catch (error) {
-                console.error("Error fetching last frame:", error);
-                handleCriticalError("Failed to fetch last frame.");
-                throw error;
-            }
+            const lastFrame = await getLastFrame(trimmedVideoUrl);
                         
             // ********************************************
             // *     Send Request to MiniMaxi 
             // ********************************************
-            handleUpdateStatus("Generating Mice Video...", 40);
-            const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
-                model: "video-01",
-                prompt: generationData.prompt,
-                first_frame_image: lastFrameDataUrl,
-            });
+            const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame);
 
-            const { task_id } = response.data;
+
+            // ********************************************
+            // *     Save Task In Case Of Refresh
+            // ********************************************
+            const { task_id } = aiGeneratedVideoTaskId;
             localStorage.setItem("currentVideoInProgress", JSON.stringify({"task_id": task_id, "trimmed_video_url": trimmedVideoUrl}));
             toast.success("Your video is still generating. Progress saved. Please continue to wait...");
             console.log("Task ID:", task_id);
@@ -358,6 +417,9 @@ function VideoGenerator() {
                 }
             } catch (error) {
                 console.error("Error deleting video from Firebase:", error.message);
+            }
+            if (isRedirectError) {
+                window.location.href = "/error";
             }
         }
     };

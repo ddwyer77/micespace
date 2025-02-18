@@ -7,11 +7,10 @@ exports.handler = async (event) => {
     if (!shotstackApiKey) {
       throw new Error("Missing Shotstack API key in environment variables.");
     }
+ 
+    const { videoUrls, audioUrl, clipLength, audioLength, maxPollingTime = 300000 } = JSON.parse(event.body);
 
-    // Parse request body
-    const { videoUrls, audioUrl, clipLength, maxPollingTime = 300000 } = JSON.parse(event.body);
-
-    if (!videoUrls || videoUrls.length !== 2 || !audioUrl || !clipLength) {
+    if (!videoUrls || videoUrls.length === 0 || !audioUrl || !clipLength || !audioLength) {
       return {
         statusCode: 400,
         body: JSON.stringify({
@@ -20,27 +19,18 @@ exports.handler = async (event) => {
       };
     }
 
-    // Create tracks using your original structure
+    const videoClips = videoUrls.map((url, index) => ({
+      asset: {
+        type: "video",
+        src: url,
+      },
+      start: index * clipLength, 
+      length: clipLength,
+    }));
+  
     const tracks = [
       {
-        clips: [
-          {
-            asset: {
-              type: "video",
-              src: videoUrls[0],
-            },
-            start: 0,
-            length: clipLength,
-          },
-          {
-            asset: {
-              type: "video",
-              src: videoUrls[1],
-            },
-            start: clipLength,
-            length: clipLength,
-          },
-        ],
+        clips: videoClips,
       },
       {
         clips: [
@@ -53,7 +43,7 @@ exports.handler = async (event) => {
               speed: 1,
             },
             start: clipLength,
-            length: clipLength,
+            length: audioLength,
           },
         ],
       },

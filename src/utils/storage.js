@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "firebase/storage";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import axios from "axios";
 
 let app;
@@ -166,4 +166,58 @@ export const addDocument = async (collectionPath, url, title, generationType) =>
       throw error;
     }
 };
+
+export const getFirestoreData = async (path, filters = []) => {
+    try {
+      const { firestore } = await initializeFirebase();
+      
+      // Determine if the path is a document or collection
+      const pathSegments = path.split("/");
+      const isDocument = pathSegments.length % 2 === 0; // Even = document, Odd = collection
+  
+      if (isDocument) {
+        // Fetch a single document
+        const docRef = doc(firestore, path);
+        const snapshot = await getDoc(docRef);
+        return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+      } else {
+        // Fetch a collection
+        let colRef = collection(firestore, path);
+        if (filters.length > 0) {
+          colRef = query(colRef, ...filters);
+        }
+        const snapshot = await getDocs(colRef);
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching Firestore data:", error);
+      throw error;
+    }
+};
+
+export const incrementFirestoreField = async (docPath, fieldName) => {
+    try {
+      const { firestore } = await initializeFirebase();
+      const docRef = doc(firestore, docPath);
+  
+      // Check if the document exists
+      const docSnapshot = await getDoc(docRef);
+      
+      if (docSnapshot.exists()) {
+        // Document exists → Increment the field
+        await updateDoc(docRef, { [fieldName]: increment(1) });
+      } else {
+        // Document doesn't exist → Create it and set field to 1
+        await setDoc(docRef, { [fieldName]: 1 }, { merge: true });
+      }
+  
+      console.log(`Incremented ${fieldName} in ${docPath}`);
+    } catch (error) {
+      console.error("Error incrementing Firestore field:", error);
+      throw error;
+    }
+  };
   
