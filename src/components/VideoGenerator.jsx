@@ -223,7 +223,7 @@ function VideoGenerator() {
         // TODO - breakpoint at generatedVideoUrls and make sure they are correct
 
         if (generationData.generationType === "tuffest_bear") {
-            generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
+            const generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
             videoUrls = [trimmedVideoUrl, ...generatedVideoUrls];
             audioLength = 10;
         }
@@ -317,7 +317,6 @@ function VideoGenerator() {
     async function getAiGeneratedVideoTaskId(lastFrameDataUrl, alternatePrompt = null) {
         const prompt = alternatePrompt ? alternatePrompt : generationData.prompt;
         try {
-            handleUpdateStatus("Generating Mice Video...", 40);
             const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
                 model: "video-01",
                 prompt: prompt,
@@ -334,6 +333,7 @@ function VideoGenerator() {
 
     async function getDoubleVideoGeneration(firstGeneratedVideo) {
         const lastFrame = await getLastFrame(firstGeneratedVideo);
+        handleUpdateStatus("Finishing up ai video generation...", 55);
         const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, promptSecondTuffestBear);
         const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
         const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
@@ -378,6 +378,7 @@ function VideoGenerator() {
             // ********************************************
             // *     Send Request to MiniMaxi 
             // ********************************************
+            handleUpdateStatus("Generating Video...", 40);
             const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame);
 
 
