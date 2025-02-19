@@ -5,11 +5,12 @@ import { useNavigate } from "react-router-dom";
 import AdminVideos from '../components/AdminVideos';
 import Dashboard from '../components/Dashboard';
 import EmergencyActions from '../components/EmergencyActions';
+import Campaigns from '../components/Campaigns';
 
 const Admin = () => {
 	const navigate = useNavigate();
 	const [currentScreen, setCurrentScreen] = useState(parseInt(localStorage.getItem("currentScreen")) || 0);
-	const tabs = [<Dashboard />, <AdminVideos />, <EmergencyActions />];
+	const tabs = [<Dashboard />, <AdminVideos />, <EmergencyActions />, <Campaigns />];
 
 	const setCurrentScreenIndex = (index) => {
 		setCurrentScreen(index);
@@ -27,7 +28,7 @@ const Admin = () => {
 	return (
 		<div className="flex flex-col justify-center w-screen align-center">
 			<div className="flex w-full justify-start ">
-				<div className="bg-primary">
+				<div className="bg-primary h-screen">
 					<ul className="mt-6">
 						<li className="hover:bg-primary-dark hover:cursor-pointer" onClick={navigateHome}>
                             <a className="text-white text-xl hover:text-gray-300 flex flex-col items-center justify-center p-4">
@@ -75,6 +76,23 @@ const Admin = () => {
                                 </span>
 								<span className="text-center">
 									Emergency Actions
+								</span>
+                            </a>
+                        </li>
+						<li className="hover:bg-primary-dark hover:cursor-pointer" onClick={() => setCurrentScreenIndex(3)}>
+                            <a className="text-white text-xl hover:text-gray-300 flex flex-col items-center justify-center p-4">
+                                <span className="mr-2">
+									<svg 
+										xmlns="http://www.w3.org/2000/svg" 
+										viewBox="0 0 24 24" 
+										fill="currentColor" 
+										className="w-6 h-6"
+									>
+										<path d="M12 2C6.48 2 2 5.58 2 10c0 2.72 1.88 5.16 4.71 6.54L6 22l4.43-3.11c.5.07 1.03.11 1.57.11 5.52 0 10-3.58 10-8s-4.48-8-10-8zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z" />
+									</svg>
+                                </span>
+								<span className="text-center">
+									Campaigns
 								</span>
                             </a>
                         </li>

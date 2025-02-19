@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import loadingMessages from "../utils/loadingMessages.js";
-import { getFileUrl, uploadFile, deleteFile, addDocument } from "../utils/storage.js";
+import { getFileUrl, uploadFile, deleteFile, addDocument, getFirestoreData, getCollectionDocs } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png';
 import MarvinCheese from '../assets/images/marvin_cheese.jpeg';
@@ -26,6 +26,8 @@ function VideoGenerator() {
     const [ loadingMessageIndex, setLoadingMessageIndex ] = useState(0);
     const [ progress, setProgress ] = useState(0);
     const [ isRedirectError, setIsRedirectError ] = useState(false);
+    const [ campaigns, setCampaigns ] = useState([]);
+    const [ currentCampaign, setCurrentCampaign ] = useState(0);
     const audioUrlMiceBandOriginal = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
     const audioUrlMarvinCheese = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fthe%20moon%20is%20hollow%20snippet.mp3?alt=media&token=735a7bac-af09-4aca-8fdf-1c08a3c0bb6c";
     const audioUrlTuffestBear = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fdavidthetragic%20new%20body%20snippet.mp3?alt=media&token=8e14a1fc-59b3-41c7-97b2-b3f245a8262d";
@@ -33,7 +35,6 @@ function VideoGenerator() {
     const promptMarvinCheese = "The camera pans over and there is a mouse man in an orange jumpsuit sitting on a stool and playing an acoustic guitar and singing.";
     const promptTuffestBear = "Camera zooms out and a cool rapper bear comes into the frame. He is wearing a flat bill hat and a obnoxious amount of rapper jewelry (big diamond chains and many diamond watches and big rings with diamonds on his fingers) he puts his hand on his shoulder and starts rapping.";
     const promptSecondTuffestBear = "A cool rapper bear is rapping with a lot of enthusiasm jumping up and down and really giving it his all.";
-    const generationTypes = ["mice_band_original", "marvin_cheese", "tuffest_bear"];
     const [ generationData, setGenerationData ] = useState({
         audioUrl: audioUrlMiceBandOriginal,
         prompt: promptMiceBandOriginal,
@@ -82,6 +83,20 @@ function VideoGenerator() {
             }
         }
     }, []);
+
+    useEffect(() => {
+        fetchCampaigns();
+    }, [])
+
+    const fetchCampaigns = async () => {
+        try {
+            const campaigns = await getCollectionDocs("campaigns");
+            setCampaigns(campaigns);
+            console.log("Campaigns:", campaigns);
+        } catch (error) {
+            console.error("Error fetching campaigns:", error);
+        }
+    }
 
     const handleVideoUpload = async (event) => {
         setUploading(true);
@@ -178,12 +193,13 @@ function VideoGenerator() {
         }
     };
 
-    const handleSelectContent = (audioUrl, prompt, generationType) => {
+    const handleSelectContent = (campaignIdx) => {
+        setCurrentCampaign(campaignIdx);
         setGenerationData((prevData) => ({
             ...prevData,
-            audioUrl: audioUrl,
-            prompt: prompt,
-            generationType: generationType
+            audioUrl: currentCampaign.audio,
+            prompt: currentCampaign.prompt,
+            generationType: currentCampaign.id
         }));
     };
     
@@ -445,30 +461,23 @@ function VideoGenerator() {
                     {/* ***** Select Content ***** */}
                     <div>
                         <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
-                        <div className="flex gap-4">
-                        <Card 
-                            onClick={() => handleSelectContent(audioUrlMiceBandOriginal, promptMiceBandOriginal, generationTypes[0])} 
-                            imageUrl={MiceBandOriginal} 
-                            name="Mice Band Original" 
-                            isSelected={generationData.generationType === generationTypes[0]} 
-                            loading={loading}
-                        />
-
-                        <Card 
-                            onClick={() => handleSelectContent(audioUrlMarvinCheese, promptMarvinCheese, generationTypes[1])} 
-                            imageUrl={MarvinCheese} 
-                            name="Marvin Cheese" 
-                            isSelected={generationData.generationType === generationTypes[1]} 
-                            loading={loading}
-                        />
-
-                        <Card 
-                            onClick={() => handleSelectContent(audioUrlTuffestBear, promptTuffestBear, generationTypes[2])} 
-                            imageUrl={TuffestBear} 
-                            name="Tuffest Bear" 
-                            isSelected={generationData.generationType === generationTypes[2]} 
-                            loading={loading}
-                        />
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {campaigns.length > 0 ? (
+                                campaigns
+                                    .filter(campaign => campaign) // Ensure campaign is not undefined/null
+                                    .map((campaign, idx) => (
+                                        <Card 
+                                            key={idx}
+                                            onClick={() => handleSelectContent(idx)} 
+                                            imageUrl={campaign?.image || ""} // Prevents undefined errors
+                                            name={campaign?.name || "Unknown"} // Prevents undefined errors
+                                            isSelected={generationData.generationType === campaign?.id} 
+                                            loading={loading}
+                                        />
+                                    ))
+                            ) : (
+                                <p>Loading Campaigns...</p>
+                            )}
                         </div>
                     </div>
 
