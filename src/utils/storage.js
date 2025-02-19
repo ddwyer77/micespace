@@ -220,4 +220,16 @@ export const incrementFirestoreField = async (docPath, fieldName) => {
       throw error;
     }
   };
+
+  export const setDocument = async (collectionPath, docId, data) => {
+    try {
+        const { firestore } = await initializeFirebase();
+        const docRef = doc(firestore, collectionPath, docId);
+        await setDoc(docRef, data, { merge: true });
+    } catch (error) {
+        console.error("Error creating Firestore document:", error);
+        throw error;
+    }
+};
+
   
