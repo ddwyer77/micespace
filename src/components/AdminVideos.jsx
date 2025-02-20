@@ -141,7 +141,7 @@ const VideoCard = ({ videoUrl, thumbnailUrl, docId, setGeneratedVideos, isApprov
         if (!userConfirmed) return;
     
         try {
-          await deleteDocument(id);
+          await deleteDocument("videos", id);
 
 
           const rawPath = decodeURIComponent(url.split("/").pop().split("?")[0]);

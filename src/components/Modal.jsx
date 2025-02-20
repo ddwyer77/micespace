@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Modal = ({ isOpen, onClose, children }) => {
+const Modal = ({ isOpen, onClose, children, showOkButton = true }) => {
     if (!isOpen) return null;
 
     return (
@@ -9,12 +9,15 @@ const Modal = ({ isOpen, onClose, children }) => {
                 <div className="flex justify-end items-center">
                     <button onClick={onClose} className="text-gray-600 hover:text-gray-900">&times;</button>
                 </div>
-                <div className="overflow-y-auto max-h-96">
+                <div className="overflow-y-auto">
                     {children}
                 </div>
-                <div className="flex justify-end mt-4">
-                    <button onClick={onClose} className="bg-primary text-white px-4 py-2 rounded">Ok</button>
-                </div>
+                {showOkButton && (
+                    <div className="flex justify-end mt-4">
+                        <button onClick={onClose} className="bg-primary text-white px-4 py-2 rounded">Ok</button>
+                    </div>
+                )}
+
             </div>
         </div>
     );

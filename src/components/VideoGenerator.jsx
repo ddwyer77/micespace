@@ -28,18 +28,7 @@ function VideoGenerator() {
     const [ isRedirectError, setIsRedirectError ] = useState(false);
     const [ campaigns, setCampaigns ] = useState([]);
     const [ currentCampaign, setCurrentCampaign ] = useState(0);
-    const audioUrlMiceBandOriginal = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2FMicebandoglink.m4a?alt=media&token=3350faaf-1949-432f-aaeb-64d27af57d5e";
-    const audioUrlMarvinCheese = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fthe%20moon%20is%20hollow%20snippet.mp3?alt=media&token=735a7bac-af09-4aca-8fdf-1c08a3c0bb6c";
-    const audioUrlTuffestBear = "https://firebasestorage.googleapis.com/v0/b/mice-band.firebasestorage.app/o/audio%2Fdavidthetragic%20new%20body%20snippet.mp3?alt=media&token=8e14a1fc-59b3-41c7-97b2-b3f245a8262d";
-    const promptMiceBandOriginal = "The Camera smoothly pans without delay over and down and there is a band of realistic mice rocking out and jamming and playing drums and guitar.";
-    const promptMarvinCheese = "The camera pans over and there is a mouse man in an orange jumpsuit sitting on a stool and playing an acoustic guitar and singing.";
-    const promptTuffestBear = "Camera zooms out and a cool rapper bear comes into the frame. He is wearing a flat bill hat and a obnoxious amount of rapper jewelry (big diamond chains and many diamond watches and big rings with diamonds on his fingers) he puts his hand on his shoulder and starts rapping.";
-    const promptSecondTuffestBear = "A cool rapper bear is rapping with a lot of enthusiasm jumping up and down and really giving it his all.";
-    const [ generationData, setGenerationData ] = useState({
-        audioUrl: audioUrlMiceBandOriginal,
-        prompt: promptMiceBandOriginal,
-        generationType: "mice_band_original"
-    });
+    const [ generationData, setGenerationData ] = useState(null);
     const clipLength = 5;
     const [ ingestedVideoId, setIngestedVideoId ] = useState("");
     const [ isModalOpen, setIsModalOpen ] = useState(false);
@@ -52,7 +41,7 @@ function VideoGenerator() {
     useEffect(() => {     
         if (!loading) return;
         const interval = setInterval(() => {
-        setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % loadingMessages[generationData.generationType].length);
+        setLoadingMessageIndex((prevIndex) => (prevIndex + 1) % generationData.loadingMessages.length);
         }, 2000);
 
         return () => clearInterval(interval);
@@ -88,10 +77,23 @@ function VideoGenerator() {
         fetchCampaigns();
     }, [])
 
+    useEffect(() => {
+        if (campaigns.length > 0 && !generationData) {
+            setGenerationData({
+                audioUrl: campaigns[0].audio,
+                prompt: campaigns[0].prompt,
+                generationType: campaigns[0].id,
+                doubleGeneration: campaigns[0].doubleGeneration,
+                loadingMessages: JSON.parse(campaigns[0].loadingMessages)
+            });
+        }
+    }, [campaigns]);
+
     const fetchCampaigns = async () => {
         try {
             const campaigns = await getCollectionDocs("campaigns");
-            setCampaigns(campaigns);
+            const sortedCampaigns = campaigns.sort((a, b) => a.sort - b.sort);
+            setCampaigns(sortedCampaigns);
             console.log("Campaigns:", campaigns);
         } catch (error) {
             console.error("Error fetching campaigns:", error);
@@ -195,14 +197,14 @@ function VideoGenerator() {
 
     const handleSelectContent = (campaignIdx) => {
         setCurrentCampaign(campaignIdx);
-        setGenerationData((prevData) => ({
-            ...prevData,
-            audioUrl: currentCampaign.audio,
-            prompt: currentCampaign.prompt,
-            generationType: currentCampaign.id
-        }));
+        setGenerationData({
+            audioUrl: campaigns[campaignIdx].audio,
+            prompt: campaigns[campaignIdx].prompt,
+            generationType: campaigns[campaignIdx].id,
+            doubleGeneration: campaigns[campaignIdx].doubleGeneration,
+            loadingMessages: JSON.parse(campaigns[campaignIdx].loadingMessages)
+        });
     };
-    
 
     const pollIngestedVideo = async (videoId, maxRetries = 30, delay = 5000) => {
         let retries = 0;
@@ -231,14 +233,10 @@ function VideoGenerator() {
         const generatedVideoUrl = await pollTaskStatus(task_id);
         console.log("Generated Video URL:", generatedVideoUrl);
     
-        // Proceed to merge the videos
         let videoUrls = [trimmedVideoUrl, generatedVideoUrl];
         let audioLength = 5;
 
-        // TODO - Check alternative prompt works
-        // TODO - breakpoint at generatedVideoUrls and make sure they are correct
-
-        if (generationData.generationType === "tuffest_bear") {
+        if (generationData.doubleGeneration == true) {
             const generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
             videoUrls = [trimmedVideoUrl, ...generatedVideoUrls];
             audioLength = 10;
@@ -266,18 +264,16 @@ function VideoGenerator() {
         const videoTitle = storagePath.split('/').pop().split('.')[0];
     
         try {
-            // 1️⃣ Upload video and get the download URL
             const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
             console.log("✅ Video uploaded to Firebase:", downloadUrl);
-    
-            // 2️⃣ Save video metadata to database
+         
             const newDocId = await addDocument("videos", downloadUrl, videoTitle, generationData.generationType);
             console.log("✅ New item added:", newDocId);
     
-            return downloadUrl; // Return for further use if needed
+            return downloadUrl;
         } catch (err) {
             console.error("❌ Error uploading or saving video:", err);
-            throw err; // Propagate error if necessary
+            throw err;
         }
     }
 
@@ -295,7 +291,6 @@ function VideoGenerator() {
             throw error;
         }
     }
-    
 
     async function getLastFrame(trimmedVideoUrl) {
         try {
@@ -344,16 +339,14 @@ function VideoGenerator() {
             handleCriticalError("Failed create AI generation task.");
             return;
         }
-
     }
 
     async function getDoubleVideoGeneration(firstGeneratedVideo) {
         const lastFrame = await getLastFrame(firstGeneratedVideo);
         handleUpdateStatus("Finishing up ai video generation...", 55);
-        const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, promptSecondTuffestBear);
+        const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, generationData.prompt);
         const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
         const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
-        // add second prompt to new ai generation
         return videoUrls;
     }
 
@@ -462,16 +455,16 @@ function VideoGenerator() {
                     <div>
                         <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {campaigns.length > 0 ? (
+                            {campaigns.length > 0 && generationData ? (
                                 campaigns
                                     .filter(campaign => campaign) // Ensure campaign is not undefined/null
                                     .map((campaign, idx) => (
                                         <Card 
                                             key={idx}
                                             onClick={() => handleSelectContent(idx)} 
-                                            imageUrl={campaign?.image || ""} // Prevents undefined errors
-                                            name={campaign?.name || "Unknown"} // Prevents undefined errors
-                                            isSelected={generationData.generationType === campaign?.id} 
+                                            imageUrl={campaign?.image || ""} 
+                                            name={campaign?.name || "Unknown"}
+                                            isSelected={currentCampaign === idx} 
                                             loading={loading}
                                         />
                                     ))
@@ -585,7 +578,7 @@ function VideoGenerator() {
                                 style={{ width: `${progress}%` }}
                                 ></div>
                             </div>
-                            <p>{loadingMessages[generationData.generationType][loadingMessageIndex]}</p>
+                            <p>{generationData.loadingMessages[loadingMessageIndex]}</p>
                         </div>
                     )}
 

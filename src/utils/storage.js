@@ -125,10 +125,10 @@ export const updateDocument = async (collectionPath, docId, data) => {
     }
 }
 
-export const deleteDocument = async (docId) => {
+export const deleteDocument = async (collectionPath, docId) => {
     try {
       const { firestore } = await initializeFirebase();
-      await deleteDoc(doc(firestore, "videos", docId));
+      await deleteDoc(doc(firestore, collectionPath, docId));
       console.log(`Document with ID ${docId} deleted from Firestore.`);
     } catch (error) {
       console.error(`Error deleting document with ID ${docId}:`, error);
