@@ -4,9 +4,6 @@ import loadingMessages from "../utils/loadingMessages.js";
 import { getFileUrl, uploadFile, deleteFile, addDocument, getFirestoreData, getCollectionDocs } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png';
-import MarvinCheese from '../assets/images/marvin_cheese.jpeg';
-import TuffestBear from '../assets/images/tuffest_bear.jpeg';
-import MiceBandOriginal from '../assets/images/mice_band_original.jpeg';
 import VideoDownloader from "./VideoDownloader.jsx";
 import Feed from './Feed';
 import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
@@ -18,7 +15,7 @@ import Card from "./Card.jsx";
 function VideoGenerator() {
     const [ videoFile, setVideoFile ] = useState(null);
     const [ messageIsCritial, setMessageIsCritial ] = useState(false);
-    const [ originalVidUrl, setOriginalVidUrl ] = useState("");
+    const [ trimmedVideo, setTrimmedVideo ] = useState("");
     const [ loading, setLoading ] = useState(false);
     const [ uploading, setUploading ] = useState(false);
     const [ status, setStatus ] = useState("");
@@ -108,7 +105,7 @@ function VideoGenerator() {
             console.error("No file selected");
             return;
         }
-   
+    
         const fileSizeMB = file.size / (1024 * 1024);
         if (fileSizeMB > 150) {
             console.error("File is larger than 150 MB");
@@ -119,36 +116,132 @@ function VideoGenerator() {
     
         setVideoFile(file);
         setStatus("");
-        const sanitizedFileName = file.name.replace(/\s+/g, "_");
-        const fileExtension = getFileExtension(file.name); 
+    
+        const formData = new FormData();
+        formData.append("video", file);
     
         try {
-            // Upload to Firebase
-            handleUpdateStatus("Uploading original video...", 0);
-            const uploadedUrl = await uploadFile(file, `videos/${sanitizedFileName}`);
-            console.log("Uploaded Video:", uploadedUrl);
-            setOriginalVidUrl(uploadedUrl); 
+            handleUpdateStatus("Uploading and trimming video...", 0);
     
-            // Compress the uploaded video
-            handleUpdateStatus("Compressing video...", 0);
-            const response = await axios.post("/.netlify/functions/compressVideo", { videoUrl: uploadedUrl, type: fileExtension });
-            console.log("Compression Response:", response.data.data.id);
-            setIngestedVideoId(response.data.data.id);
+            const response = await axios.post("http://localhost:5000/api/trim-video", formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+                responseType: "blob", // Receive trimmed video as a file
+            });
     
-            handleUpdateStatus("Video uploaded.", 0);
+            const blob = new Blob([response.data], { type: "video/mp4" });
+            const trimmedVideoUrl = URL.createObjectURL(blob);
+            setTrimmedVideo(trimmedVideoUrl); // Store the trimmed video URL
+    
+            handleUpdateStatus("Video uploaded and trimmed.", 0);
             setUploading(false);
         } catch (error) {
-            console.error("Error uploading video:", error);
-            handleCriticalError("Failed to upload video.");
+            console.error("Error processing video:", error);
+            handleCriticalError("Failed to process video.");
             setUploading(false);
         }
     };
-      
-    const getFileExtension = (filename) => {
-        console.log("Extracting file extension for:", filename);
-        const match = filename.match(/\.([a-zA-Z0-9]+)$/);
-        return match ? match[1].toLowerCase() : '';
+
+    const extractLastFrame = async (videoBlobUrl) => {
+        try {
+            // Fetch the blob as a file
+            const response = await fetch(videoBlobUrl);
+            const blob = await response.blob();
+            const file = new File([blob], "trimmed_video.mp4", { type: "video/mp4" });
+    
+            // Create FormData to send the file
+            const formData = new FormData();
+            formData.append("video", file);
+    
+            const serverResponse = await axios.post("http://localhost:5000/api/extract-last-frame", formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+                responseType: "blob", // Expect an image file as response
+            });
+    
+            // Convert response to a blob URL
+            const imageBlob = new Blob([serverResponse.data], { type: "image/jpeg" });
+            const imageUrl = URL.createObjectURL(imageBlob);
+            console.log("Extracted Frame URL:", imageUrl);
+            return imageUrl;
+        } catch (error) {
+            console.error("Error extracting last frame:", error);
+        }
     };
+
+    const generateAIvideo = async (blobUrl, prompt) => {
+        try {
+            // Convert Blob to File
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            const file = new File([blob], "frame.png", { type: "image/png" });
+    
+            // Upload the frame to the backend
+            const formData = new FormData();
+            formData.append("image", file);
+            formData.append("prompt", prompt);
+    
+            const uploadResponse = await axios.post("http://localhost:5000/api/generate-video", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+    
+            if (uploadResponse.data.task_id) {
+                console.log("AI video generation started. Task ID:", uploadResponse.data.task_id);
+                return uploadResponse.data.task_id;
+            }
+        } catch (error) {
+            console.error("Error generating AI video:", error);
+        }
+    };
+    
+    const checkVideoStatus = async (taskId) => {
+        try {
+            const statusResponse = await axios.get(`http://localhost:5000/api/video-status/${taskId}`);
+    
+            if (statusResponse.data.status === "Success") {
+                console.log("Video ready! File ID:", statusResponse.data.file_id);
+                return statusResponse.data.file_id;
+            } else {
+                console.log("Still processing... Current status:", statusResponse.data.status);
+                return null;
+            }
+        } catch (error) {
+            console.error("Error checking video status:", error);
+        }
+    };
+    
+    const getAIvideo = async (fileId) => {
+        try {
+            const videoResponse = await axios.get(`http://localhost:5000/api/get-video/${fileId}`);
+    
+            if (videoResponse.data.download_url) {
+                console.log("Download AI Video:", videoResponse.data.download_url);
+                return videoResponse.data.download_url;
+            }
+        } catch (error) {
+            console.error("Error retrieving AI video:", error);
+        }
+    };
+    
+    // Example: Call the AI video generation
+    const processAIvideo = async (blobUrl) => {
+        const taskId = await generateAIvideo(blobUrl, generationData.prompt);
+    
+        if (taskId) {
+            // Poll the status every 10 seconds
+            const interval = setInterval(async () => {
+                const fileId = await checkVideoStatus(taskId);
+                if (fileId) {
+                    clearInterval(interval);
+                    const videoUrl = await getAIvideo(fileId);
+                    console.log("AI Video Ready:", videoUrl);
+                    return videoUrl;
+                }
+            }, 10000);
+        }
+    };    
 
     const handleUpdateStatus = (message, progress) =>{
         setMessageIsCritial(false);
@@ -168,33 +261,6 @@ function VideoGenerator() {
         setHasAcceptedTerms(event.target.checked);
     };
 
-    const pollTaskStatus = async (task_id) => {
-        try {
-            let status = "Queueing";
-            let generatedVideoUrl = "";
-
-            while (["Queueing", "Processing", "Preparing"].includes(status)) {
-                await new Promise((resolve) => setTimeout(resolve, 20000)); // Wait 5 seconds
-
-                const response = await axios.post("/.netlify/functions/checkTaskStatus", { task_id });
-                const data = response.data;
-                status = data.status;
-
-                if (status === "Success") {
-                    generatedVideoUrl = data.generatedVideoUrl;
-                    return generatedVideoUrl;
-                } else if (status === "Fail") {
-                    throw new Error("Video generation failed.");
-                }
-
-                handleUpdateStatus(`Video generation status: ${status}`, 50);
-            }
-        } catch (error) {
-            console.error("Error polling task status:", error);
-            handleCriticalError("Failed to generate video.");
-        }
-    };
-
     const handleSelectContent = (campaignIdx) => {
         setCurrentCampaign(campaignIdx);
         setGenerationData({
@@ -206,58 +272,7 @@ function VideoGenerator() {
         });
     };
 
-    const pollIngestedVideo = async (videoId, maxRetries = 30, delay = 5000) => {
-        let retries = 0;
-        while (retries < maxRetries) {
-            try {
-                const response = await axios.post("/.netlify/functions/getIngestedVideo", {
-                    videoId,
-                });
-                const rendition = response.data.attributes.outputs.renditions[0];
-                if (rendition && rendition.url) {
-                    return rendition.url;
-                }
-            } catch (error) {
-                console.error(`Error getting ingested video (attempt ${retries + 1}):`, error.message);
-            }
-        
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            retries++;
-        }
     
-        throw new Error("Ingested video is not ready after maximum retries.");
-    };
-
-    async function mergeVideos(trimmedVideoUrl, task_id) {
-        setIsMerging(true);
-        const generatedVideoUrl = await pollTaskStatus(task_id);
-        console.log("Generated Video URL:", generatedVideoUrl);
-    
-        let videoUrls = [trimmedVideoUrl, generatedVideoUrl];
-        let audioLength = 5;
-
-        if (generationData.doubleGeneration == true) {
-            const generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
-            videoUrls = [trimmedVideoUrl, ...generatedVideoUrls];
-            audioLength = 10;
-        }
-
-        const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
-            videoUrls,
-            audioUrl: generationData.audioUrl,
-            clipLength,
-            audioLength: audioLength
-        });
-    
-        const mergedVideoUrl = mergeResponse.data.renderUrl;
-        console.log("Merged Video URL:", mergedVideoUrl);
-    
-        setDownloadUrl(mergedVideoUrl);
-        await uploadAndSaveVideo(mergedVideoUrl)
-        handleUpdateStatus("Video generated successfully.", 100);
-        localStorage.removeItem("currentVideoInProgress");
-        setIsMerging(false);
-    }
 
     async function uploadAndSaveVideo(mergedVideoUrl) {
         const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
@@ -277,78 +292,14 @@ function VideoGenerator() {
         }
     }
 
-    async function getIngestedVideoUrl(ingestedVideoId) {
-        try {
-            const ingestedVideoUrl = await pollIngestedVideo(ingestedVideoId);
-            if (!ingestedVideoUrl) {
-                throw new Error("Failed to retrieve ingested video URL.");
-            }
-            console.log("Ingested Video Url:", ingestedVideoUrl);
-            return ingestedVideoUrl;
-        } catch (error) {
-            console.error("Error getting ingested video:", error.message);
-            handleCriticalError("Failed to get ingested video URL.");
-            throw error;
-        }
-    }
-
-    async function getLastFrame(trimmedVideoUrl) {
-        try {
-            const response = await axios.post("/.netlify/functions/getLastFrame", {
-                trimmedVideoUrl,
-                clipLength,
-            });
-            const lastFrameDataUrl = response.data.renderUrl;
-            console.log("Last Frame:", lastFrameDataUrl);
-            return lastFrameDataUrl;
-        } catch (error) {
-            console.error("Error fetching last frame:", error);
-            handleCriticalError("Failed to fetch last frame.");
-            throw error;
-        }
-    }
-
-    async function trimVideo(ingestedVideoUrl) {
-        try {
-            handleUpdateStatus("Trimming video...", 20);
-            const response = await axios.post("/.netlify/functions/trimVideo", {
-              videoUrl: ingestedVideoUrl,
-              clipLength
-            });
-            const trimmedVideoUrl = response.data.trimmedVideoUrl;
-            console.log("Trimmed Video:", trimmedVideoUrl);
-            return trimmedVideoUrl;
-        } catch (error) {
-            console.error(error);
-            handleCriticalError("Failed to trim video.");
-            return;
-        }
-    }
-
-    async function getAiGeneratedVideoTaskId(lastFrameDataUrl, alternatePrompt = null) {
-        const prompt = alternatePrompt ? alternatePrompt : generationData.prompt;
-        try {
-            const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
-                model: "video-01",
-                prompt: prompt,
-                first_frame_image: lastFrameDataUrl,
-            });
-            return response.data;
-        } catch (error) {
-            console.error(error);
-            handleCriticalError("Failed create AI generation task.");
-            return;
-        }
-    }
-
-    async function getDoubleVideoGeneration(firstGeneratedVideo) {
-        const lastFrame = await getLastFrame(firstGeneratedVideo);
-        handleUpdateStatus("Finishing up ai video generation...", 55);
-        const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, generationData.prompt);
-        const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
-        const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
-        return videoUrls;
-    }
+    // async function getDoubleVideoGeneration(firstGeneratedVideo) {
+    //     const lastFrame = await getLastFrame(firstGeneratedVideo);
+    //     handleUpdateStatus("Finishing up ai video generation...", 55);
+    //     const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, generationData.prompt);
+    //     const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
+    //     const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
+    //     return videoUrls;
+    // }
 
     const handleGenerateVideo = async () => {
         if (!videoFile) {
@@ -369,43 +320,25 @@ function VideoGenerator() {
         handleUpdateStatus("Initializing process...", 5);
 
         try {
-            // ********************************************
-            // *     Get Ingested Video
-            // ********************************************
-            const ingestedVideoUrl = await getIngestedVideoUrl(ingestedVideoId);
 
-            // ********************************************
-            // *     Trim Video To 5 Seconds
-            // ********************************************
-            const trimmedVideoUrl = await trimVideo(ingestedVideoUrl);
-
-            // ********************************************
-            // *     Get Last Frame
-            // ********************************************
-            const lastFrame = await getLastFrame(trimmedVideoUrl);
+            const lastFrame = await extractLastFrame(trimmedVideo);
                         
             // ********************************************
             // *     Send Request to MiniMaxi 
             // ********************************************
             handleUpdateStatus("Generating Video...", 40);
-            const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame);
+            const aiVideo = await processAIvideo(lastFrame);
 
+            console.log("AI Video:", aiVideo);
 
             // ********************************************
             // *     Save Task In Case Of Refresh
             // ********************************************
-            const { task_id } = aiGeneratedVideoTaskId;
-            localStorage.setItem("currentVideoInProgress", JSON.stringify({"task_id": task_id, "trimmed_video_url": trimmedVideoUrl}));
-            toast.success("Your video is still generating. Progress saved. Please continue to wait...");
-            console.log("Task ID:", task_id);
+            // const { task_id } = aiGeneratedVideoTaskId;
+            // localStorage.setItem("currentVideoInProgress", JSON.stringify({"task_id": task_id, "trimmed_video_url": trimmedVideoUrl}));
+            // toast.success("Your video is still generating. Progress saved. Please continue to wait...");
+            // console.log("Task ID:", task_id);
 
-            try {
-                await mergeVideos(trimmedVideoUrl, task_id);
-            } catch (error) {
-                console.error("❌ Error during video merge:", error);
-                handleCriticalError("Failed to merge video.");
-                throw error;
-            }
 
         } catch (error) {
             console.error("Error generating video:", error.message);
@@ -413,21 +346,6 @@ function VideoGenerator() {
             document.write("Error generating video:", error.message);
         } finally {
             setLoading(false);
-
-            // ********************************************
-            // *     Delete Original Video
-            // ********************************************
-            try {
-                if (originalVidUrl) {
-                    const filePath = decodeURIComponent(originalVidUrl.split("/o/")[1].split("?")[0]);
-                    await deleteFile(filePath);
-                    console.log("Original video deleted from Firebase.");
-                } else {
-                    console.log("No original video URL available to delete.");
-                }
-            } catch (error) {
-                console.error("Error deleting video from Firebase:", error.message);
-            }
             if (isRedirectError) {
                 window.location.href = "/error";
             }
