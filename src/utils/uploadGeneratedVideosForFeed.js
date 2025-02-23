@@ -1,17 +1,29 @@
-import { uploadFile, getFileUrl } from "../utils/storage.js";
+import { uploadFile } from "../utils/storage.js";
 import axios from "axios";
 
-const uploadGeneratedVideosForFeed = async (videoUrl, storagePath) => {
+const uploadGeneratedVideosForFeed = async (videoSource, storagePath) => {
     try {
-        const response = await axios.get(videoUrl, { responseType: "blob" });
-        const videoBlob = response.data;
+        let videoBlob;
 
-        // Use uploadFile directly from utils
+        if (typeof videoSource === "string") {
+            // If it's a URL, fetch the Blob
+            console.log("Fetching video from URL...");
+            const response = await axios.get(videoSource, { responseType: "blob" });
+            videoBlob = response.data;
+        } else if (videoSource instanceof Blob) {
+            // If it's already a Blob, use it directly
+            console.log("Uploading provided Blob...");
+            videoBlob = videoSource;
+        } else {
+            throw new Error("Invalid video source. Must be a URL or Blob.");
+        }
+
+        // Upload the file
         const downloadUrl = await uploadFile(videoBlob, storagePath);
-        console.log("Video uploaded successfully. URL:", downloadUrl);
+        console.log("✅ Video uploaded successfully:", downloadUrl);
         return downloadUrl;
     } catch (error) {
-        console.error("Error uploading video from URL:", error);
+        console.error("❌ Error uploading video:", error);
         throw error;
     }
 };

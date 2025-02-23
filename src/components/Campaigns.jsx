@@ -210,7 +210,7 @@ const Campaigns = () => {
                                 onChange={(e) => setCurrentCampaign({ ...currentCampaign, doubleGeneration: e.target.checked })}
                                 className="p-2"
                             />
-                            <p htmlFor="name" className="block">Double Generation <span className="text-red-600">(10 second AI section. 2 Hailuo requests.)</span></p>
+                            <p htmlFor="name" className="block">Double Duration</p>
                         </div>
 
                         <div className="flex justify-between">

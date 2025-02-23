@@ -28,7 +28,7 @@ const Admin = () => {
 	return (
 		<div className="flex flex-col justify-center w-screen align-center">
 			<div className="flex w-full justify-start ">
-				<div className="bg-primary h-screen">
+				<div className="bg-primary h-screen w-16 md:w-40">
 					<ul className="mt-6">
 						<li className="hover:bg-primary-dark hover:cursor-pointer" onClick={navigateHome}>
                             <a className="text-white text-xl hover:text-gray-300 flex flex-col items-center justify-center p-4">
@@ -38,7 +38,7 @@ const Admin = () => {
 								</svg>
 
                                 </span>
-								<span className="text-center">
+								<span className="text-center text-xs md:text-base">
 									Landing
 								</span>
                             </a>
@@ -50,7 +50,7 @@ const Admin = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h6v6H3V3zM3 15h6v6H3v-6zM15 3h6v6h-6V3zM15 15h6v6h-6v-6z" />
                                     </svg>
                                 </span>
-								<span className="text-center">
+								<span className="text-center text-xs md:text-base">
 									Dashboard
 								</span>
                             </a>
@@ -62,7 +62,7 @@ const Admin = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h11a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
                                     </svg>
                                 </span>
-								<span className="text-center">
+								<span className="text-center text-xs md:text-base">
 									Videos
 								</span>
                             </a>
@@ -74,7 +74,7 @@ const Admin = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </span>
-								<span className="text-center">
+								<span className="text-center text-xs md:text-base">
 									Emergency Actions
 								</span>
                             </a>
@@ -91,7 +91,7 @@ const Admin = () => {
 										<path d="M12 2C6.48 2 2 5.58 2 10c0 2.72 1.88 5.16 4.71 6.54L6 22l4.43-3.11c.5.07 1.03.11 1.57.11 5.52 0 10-3.58 10-8s-4.48-8-10-8zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z" />
 									</svg>
                                 </span>
-								<span className="text-center">
+								<span className="text-center text-xs md:text-base">
 									Campaigns
 								</span>
                             </a>
