@@ -30,6 +30,9 @@ function VideoGenerator() {
     const [ showError, setShowError ] = useState(false);
     const [ isProcessingVideo, setIsProcessingVideo ] = useState(false);
     const [ isAuthenticated, setIsAuthenticated ] = useState(false);
+    // TODO: Update the base URL
+    // const baseUrl = "http://localhost:5000";
+    const baseUrl = `https://${process.env.API_BASE_URL}`;
     const clipLength = 5;
 
     useEffect(() => {     
@@ -114,48 +117,138 @@ function VideoGenerator() {
             alert("Please select a video file.");
             return;
         }
-
+    
         setIsProcessingVideo(true);
         setProgress(0);
         getVideoProcessProgress();
         setLoading(true);
         setDownloadUrl("");
-
+    
         const formData = new FormData();
         formData.append("originalVideo", videoFile);
         formData.append("prompt", generationData.prompt);
         formData.append("clipLength", clipLength);
         formData.append("audioUrl", generationData.audioUrl);
         formData.append("generationType", generationData.generationType);
-        formData.append("doubleGeneration", generationData.doubleGeneration);
-
+    
         try {
-            const response = await axios.post("http://localhost:5000/api/process-video", formData, {
+            // Step 1: Get Task Id
+            const response = await axios.post(`${baseUrl}/api/get-task-id`, formData, {
                 headers: { "Content-Type": "multipart/form-data" },
-                responseType: "blob", // Ensure response is a file
             });
     
-            // Create a Blob URL for the received video file
-            const blob = new Blob([response.data], { type: "video/mp4" });
-            const videoUrl = URL.createObjectURL(blob);
-            const generationType = response.headers["x-generation-type"];
-            
-            // Set download URL for user to access
-            setDownloadUrl(videoUrl);
-            console.log(videoUrl);
+            let { task_id, trimmed_video } = response.data;
 
+            if (task_id) {
+                localStorage.setItem("task_id", task_id);
+            }
+
+            //TODO: swap before merge
+            // task_id = '241528415490229';
+            await waitBeforePolling();
+
+            const file_id = await pollMiniMaxForVideo(task_id);
+            console.log("🎥 AI-generated video File ID:", file_id);
+
+            // const miniMaxVideo = await getMiniMaxVideo(file_id);
+            // console.log("🎥 AI Video URL:", miniMaxVideo);
+    
+            formData.append("aiVideoFileId", file_id);
+            formData.append("trimmedVideo", trimmed_video);
+
+            // Step 3: Wait for the final processed video 
+            const finalVideoResponse = await axios.post(
+                `${baseUrl}/api/complete-video`,
+                JSON.stringify({
+                    aiVideoFileId: file_id,
+                    trimmedVideo: trimmed_video,
+                    audioUrl: generationData.audioUrl,
+                    doubleGeneration: generationData.doubleGeneration,
+                    clipLength
+                }),
+                {
+                    headers: { "Content-Type": "application/json" },
+                    responseType: "blob",
+                }
+            );
+    
+            // Step 4: Convert response to downloadable video URL
+            const blob = new Blob([finalVideoResponse.data], { type: "video/mp4" });
+            const videoUrl = URL.createObjectURL(blob);
+            
+            // Step 5: Set state with the final video
+            setDownloadUrl(videoUrl);
+            console.log("✅ Final video ready:", videoUrl);
+    
+            // Step 6: Upload video to Firebase for preview
             const dbPreviewUrl = await uploadAndSaveVideo(videoUrl);
             setPreviewUrl(dbPreviewUrl);
     
         } catch (error) {
-            console.error("Error processing video:", error);
+            console.error("❌ Error processing video:", error);
             setIsProcessingVideo(false);
-            window.location.href = "/error";
+            // window.location.href = "/error";
         } finally {
             setLoading(false);
             setIsProcessingVideo(false);
         }
     };
+
+    const waitBeforePolling = () => {
+        return new Promise(resolve => {
+            console.log("⏳ Waiting for AI Generation...");
+            setTimeout(() => {
+                console.log("✅ 3 minutes passed, starting polling...");
+                resolve();
+            }, 180000); // 180000ms = 3 minutes
+        });
+    };
+
+    const pollMiniMaxForVideo = async (taskId) => {
+        const pollInterval = 15000; // 15 seconds
+    
+        console.log(`⏳ Starting polling for AI video with Task ID: ${taskId}`);
+    
+        while (true) {
+            try {
+                const response = await fetch("/.netlify/functions/poll-ai-video", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ taskId }),
+                });
+    
+                const data = await response.json();
+    
+                if (data.status === "Success") {
+                    console.log("✅ AI Video Ready:", data.file_id);
+                    return data.file_id; // Return file_id when done
+                }
+    
+                console.log("⏳ Video still processing... Checking again in 15 sec...");
+            } catch (error) {
+                console.error("❌ Error polling MiniMax:", error);
+            }
+    
+            await new Promise(res => setTimeout(res, pollInterval));
+        }
+    };
+
+    // const getMiniMaxVideo = async (file_id) => {
+    //     try {
+    //         const response = await fetch("/.netlify/functions/get-ai-video", {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({ file_id: file_id }),
+    //         });
+    
+    //         const data = await response.json();
+    //         console.log("🎥 AI Video URL:", data.videoUrl);
+    //         return data.videoUrl;
+    //     } catch (error) {
+    //         console.error("❌ Error getting AI video:", error);
+    //         return null;
+    //     }
+    // };
 
     const handleUpdateStatus = (message) =>{
         setMessageIsCritial(false);
