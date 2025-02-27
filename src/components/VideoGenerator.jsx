@@ -26,9 +26,13 @@ function VideoGenerator() {
     const [ currentCampaign, setCurrentCampaign ] = useState(0);
     const [ generationData, setGenerationData ] = useState(null);
     const [ isModalOpen, setIsModalOpen ] = useState(false);
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [videoToPreview, setVideoToPreview] = useState("");
     const [ hasAcceptedTerms, setHasAcceptedTerms ] = useState(false);
     const [ showError, setShowError ] = useState(false);
     const [ isProcessingVideo, setIsProcessingVideo ] = useState(false);
+    const [ email, setEmail ] = useState("");
+    const [ isValidEmail, setIsValidEmail ] = useState(false);
     const [ isAuthenticated, setIsAuthenticated ] = useState(false);
     const isLocal = import.meta.env.NODE_ENV === "development" || !import.meta.env.API_BASE_URL;
     const baseUrl = isLocal ? "http://localhost:5000" : `https://${import.meta.env.API_BASE_URL}`;
@@ -46,6 +50,13 @@ function VideoGenerator() {
     useEffect(() => {
         fetchCampaigns();
     }, [])
+
+    useEffect(() => {
+        const storedEmail = localStorage.getItem("email");
+        if (storedEmail) {
+            setEmail(storedEmail);
+        }
+    }, []);
 
     useEffect(() => {
         if (campaigns.length > 0 && !generationData) {
@@ -116,6 +127,8 @@ function VideoGenerator() {
             alert("Please select a video file.");
             return;
         }
+
+        const currentEmail = (email && isValidEmail && email != "") ? email : null;
     
         setIsProcessingVideo(true);
         setProgress(0);
@@ -129,6 +142,7 @@ function VideoGenerator() {
         formData.append("clipLength", clipLength);
         formData.append("audioUrl", generationData.audioUrl);
         formData.append("generationType", generationData.generationType);
+        formData.append("email", email);
     
         try {
             // Step 1: Get Task Id
@@ -163,25 +177,27 @@ function VideoGenerator() {
                     trimmedVideo: trimmed_video,
                     audioUrl: generationData.audioUrl,
                     doubleGeneration: generationData.doubleGeneration,
-                    clipLength
+                    clipLength,
+                    generationType: generationData.generationType,
+                    email: currentEmail
                 }),
                 {
                     headers: { "Content-Type": "application/json" },
-                    responseType: "blob",
+                    responseType: "json"
                 }
             );
     
-            // Step 4: Convert response to downloadable video URL
-            const blob = new Blob([finalVideoResponse.data], { type: "video/mp4" });
-            const videoUrl = URL.createObjectURL(blob);
+       
+            // const blob = new Blob([finalVideoResponse.data], { type: "video/mp4" });
+            // const videoUrl = URL.createObjectURL(blob);
             
             // Step 5: Set state with the final video
-            setDownloadUrl(videoUrl);
-            console.log("✅ Final video ready:", videoUrl);
+            setDownloadUrl(finalVideoResponse.data.videoUrl);
+            console.log("✅ Final video ready:", finalVideoResponse.data.videoUrl);
     
             // Step 6: Upload video to Firebase for preview
-            const dbPreviewUrl = await uploadAndSaveVideo(videoUrl);
-            setPreviewUrl(dbPreviewUrl);
+            // const dbPreviewUrl = await uploadAndSaveVideo(videoUrl);
+            setPreviewUrl(finalVideoResponse.data.videoUrl);
     
         } catch (error) {
             console.error("❌ Error processing video:", error);
@@ -232,22 +248,21 @@ function VideoGenerator() {
         }
     };
 
-    // const getMiniMaxVideo = async (file_id) => {
-    //     try {
-    //         const response = await fetch("/.netlify/functions/get-ai-video", {
-    //             method: "POST",
-    //             headers: { "Content-Type": "application/json" },
-    //             body: JSON.stringify({ file_id: file_id }),
-    //         });
+    const handleEnterEmail = (event) => {
+        const emailValue = event.target.value;
+        setEmail(emailValue);
     
-    //         const data = await response.json();
-    //         console.log("🎥 AI Video URL:", data.videoUrl);
-    //         return data.videoUrl;
-    //     } catch (error) {
-    //         console.error("❌ Error getting AI video:", error);
-    //         return null;
-    //     }
-    // };
+        // Regular expression for basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+        if (emailValue === "" || emailRegex.test(emailValue)) {
+            setIsValidEmail(true);
+            localStorage.setItem("email", emailValue); // Store the email in localStorage if valid or empty
+        } else {
+            setIsValidEmail(false);
+            console.error("Invalid email address");
+        }
+    };
 
     const handleUpdateStatus = (message) =>{
         setMessageIsCritial(false);
@@ -275,23 +290,10 @@ function VideoGenerator() {
         });
     };
 
-    async function uploadAndSaveVideo(mergedVideoUrl) {
-        const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
-        const videoTitle = storagePath.split('/').pop().split('.')[0];
-    
-        try {
-            const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
-            console.log("✅ Video uploaded to Firebase:", downloadUrl);
-         
-            const newDocId = await addDocument("videos", downloadUrl, videoTitle, generationData.generationType);
-            console.log("✅ New item added:", newDocId);
-    
-            return downloadUrl;
-        } catch (err) {
-            console.error("❌ Error uploading or saving video:", err);
-            throw err;
-        }
-    }
+    const handleOpenVideoModal = (videoUrl) => {
+        setVideoToPreview(videoUrl);
+        setIsVideoModalOpen(true);
+    };
 
     const handleGenerateVideo = async () => {
         if (!videoFile) {
@@ -307,8 +309,35 @@ function VideoGenerator() {
             }, 5000);
             return;
         }
+
+        // TODO: Email
+        // if (!isValidEmail && email != "") {
+        //     handleUpdateStatus("Please enter a valid email.");
+        //     toast.error("Please enter a valid email.");
+        //     return;
+        // }
         
         processVideo();
+    };
+
+    const handleShareToTikTok = async () => {
+        if (!downloadUrl) {
+            console.error("No video available to share.");
+            return;
+        }
+   
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.setAttribute("download", "miceband_video.mp4");
+        document.body.appendChild(link);
+    
+        link.click();
+ 
+        document.body.removeChild(link);
+    
+        setTimeout(() => {
+            window.location.href = "https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload";
+        }, 2000); 
     };
 
     return (
@@ -316,6 +345,14 @@ function VideoGenerator() {
             <div className="max-w-2xl flex flex-col gap-4">
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
+                    {/* ***** Email ***** */}
+                    {/* <div className="w-full">
+                        <h3 className="text-2xl font-bold w-full text-start">Email (Optional)</h3>
+                        <p className="text-gray-700 w-full">We'll send you a link to download your video.</p>
+                        {!isValidEmail && email != "" && <p className="text-red-600 font-bold">*Please enter a valid email.</p>}
+                        <input type="email" value={email} placeholder="Email" className="block w-full border rounded-lg p-2 h-12" onChange={handleEnterEmail} />
+                    </div> */}
+       
 
                     {/* ***** Upload ***** */}
                     <div className="w-full">
@@ -391,37 +428,33 @@ function VideoGenerator() {
                         </div>
                     )}
 
-                    {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 8 minutes. <span className="font-bold italic text-red-600">**Please don't close the page.</span></p>)}
+                    {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 5 minutes. <span className="font-bold italic text-red-600">**Please don't close the page.</span></p>)}
                     {status && <p className={`mt-4 ${messageIsCritial ? "text-red-600" : "text-gray-700"}`}>{status}</p>}
 
                     {downloadUrl && previewUrl && (
                         <div className="w-full flex flex-col gap-4">
                             <a
-                                href={previewUrl}
+                                onClick={() => handleOpenVideoModal(previewUrl)}
                                 target="_blank"
                                 download
                                 className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
                                 >
                                 View Video
                             </a>
-                            <VideoDownloader 
-                                videoUrl={downloadUrl} 
-                                fileName="miceband_video.mp4" 
-                                bgColor="bg-gray" 
-                                hoverBgColor="bg-slate-900" 
-                                textColor="text-white"
-                                textContent="Download Video"
-                            />
-                            <VideoDownloader 
-                                videoUrl={downloadUrl} 
-                                fileName="miceband_video.mp4" 
-                                bgColor="bg-[#23E7E0]" 
-                                hoverBgColor="bg-[#64fffa]" 
-                                redirectUrl="https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload" 
-                                textColor="text-black"
-                                icon={<TikTokIcon />}
-                                textContent="Share To TikTok"
-                            />
+                            <a
+                                href={downloadUrl}
+                                target="_blank"
+                                download
+                                className="block bg-slate-900 text-white hover:text-white hover:bg-slate-900 px-4 rounded-lg w-full text-center py-4"
+                                >
+                                Download Video
+                            </a>
+                            <button
+                                onClick={handleShareToTikTok}
+                                className="flex justify-center items-center bg-[#23E7E0] text-white hover:text-white hover:bg-[#64fffa] px-4 rounded-lg w-full text-center py-4"
+                            >
+                            {<TikTokIcon />} Share To TikTok
+                            </button>
                         </div>
                     )}
 
@@ -448,10 +481,29 @@ function VideoGenerator() {
                         </div>
                     </div>
 
+                    {/* ***** Video Modal ***** */}
+                    <Modal
+                        isOpen={isVideoModalOpen}
+                        onClose={() => setIsVideoModalOpen(false)}
+                    >
+                        <h3 className="text-2xl font-bold mb-4">Preview Video</h3>
+                        <video controls className="w-full rounded-lg">
+                            <source src={videoToPreview} type="video/mp4" />
+                            Your browser does not support the video tag.
+                        </video>
+                        <div className="flex justify-end mt-4">
+                            <button 
+                                onClick={() => setIsVideoModalOpen(false)} 
+                                className="bg-gray-500 text-white px-4 py-2 rounded"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </Modal>
+
                     <Feed />
                 </div>
             </div>
-            
         </div>
     );
 }
