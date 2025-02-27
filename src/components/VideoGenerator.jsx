@@ -30,9 +30,8 @@ function VideoGenerator() {
     const [ showError, setShowError ] = useState(false);
     const [ isProcessingVideo, setIsProcessingVideo ] = useState(false);
     const [ isAuthenticated, setIsAuthenticated ] = useState(false);
-    // TODO: Update the base URL
-    // const baseUrl = "http://localhost:5000";
-    const baseUrl = `https://${process.env.API_BASE_URL}`;
+    const isLocal = import.meta.env.NODE_ENV === "development" || !import.meta.env.API_BASE_URL;
+    const baseUrl = isLocal ? "http://localhost:5000" : `https://${import.meta.env.API_BASE_URL}`;
     const clipLength = 5;
 
     useEffect(() => {     
