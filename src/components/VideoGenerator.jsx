@@ -35,7 +35,7 @@ function VideoGenerator() {
     const [ isValidEmail, setIsValidEmail ] = useState(false);
     const [ isAuthenticated, setIsAuthenticated ] = useState(false);
     const isLocal = import.meta.env.VITE_NODE_ENV === "development" || !import.meta.env.VITE_API_BASE_URL;
-    const baseUrl = isLocal ? "http://localhost:5000" : `https://${import.meta.env.VITE_API_BASE_URL}`;
+    const baseUrl = isLocal ? "http://localhost:5000" : import.meta.env.VITE_API_BASE_URL;
     const clipLength = 5;
 
     useEffect(() => {     
