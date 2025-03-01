@@ -213,7 +213,7 @@ function VideoGenerator() {
         return new Promise(resolve => {
             console.log("⏳ Waiting for AI Generation...");
             setTimeout(() => {
-                console.log("✅ 3 minutes passed, starting polling...");
+                console.log("✅ Starting polling...");
                 resolve();
             }, 180000); // 180000ms = 3 minutes
         });
@@ -221,10 +221,12 @@ function VideoGenerator() {
 
     const pollMiniMaxForVideo = async (taskId) => {
         const pollInterval = 15000; // 15 seconds
+        const maxRetries = 10; // 🔹 Max attempts before erroring out
+        let attempts = 0;
     
         console.log(`⏳ Starting polling for AI video with Task ID: ${taskId}`);
     
-        while (true) {
+        while (attempts < maxRetries) {
             try {
                 const response = await fetch("/.netlify/functions/poll-ai-video", {
                     method: "POST",
@@ -239,9 +241,15 @@ function VideoGenerator() {
                     return data.file_id; // Return file_id when done
                 }
     
-                console.log("⏳ Video still processing... Checking again in 15 sec...");
+                console.log(`⏳ Video still processing... Attempt ${attempts + 1} of ${maxRetries}`);
             } catch (error) {
                 console.error("❌ Error polling MiniMax:", error);
+            }
+    
+            attempts++;
+            if (attempts >= maxRetries) {
+                console.error("❌ Maximum polling attempts reached. AI Video not ready.");
+                throw new Error("AI video processing timed out after 10 attempts.");
             }
     
             await new Promise(res => setTimeout(res, pollInterval));
