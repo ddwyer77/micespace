@@ -55,6 +55,7 @@ function VideoGenerator() {
         const storedEmail = localStorage.getItem("email");
         if (storedEmail) {
             setEmail(storedEmail);
+            setIsValidEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(storedEmail));
         }
     }, []);
 
@@ -71,7 +72,7 @@ function VideoGenerator() {
     }, [campaigns]);
 
     const getVideoProcessProgress = () => {
-        const duration = generationData.doubleGeneration ? 500 : 300;
+        const duration = 500;
         const intervalTime = 1000; // 1 second
         const increment = 100 / duration; // Increment per second
     
@@ -162,9 +163,6 @@ function VideoGenerator() {
 
             const file_id = await pollMiniMaxForVideo(task_id);
             console.log("🎥 AI-generated video File ID:", file_id);
-
-            // const miniMaxVideo = await getMiniMaxVideo(file_id);
-            // console.log("🎥 AI Video URL:", miniMaxVideo);
     
             formData.append("aiVideoFileId", file_id);
             formData.append("trimmedVideo", trimmed_video);
@@ -186,23 +184,16 @@ function VideoGenerator() {
                     responseType: "json"
                 }
             );
-    
-       
-            // const blob = new Blob([finalVideoResponse.data], { type: "video/mp4" });
-            // const videoUrl = URL.createObjectURL(blob);
-            
-            // Step 5: Set state with the final video
+  
             setDownloadUrl(finalVideoResponse.data.videoUrl);
             console.log("✅ Final video ready:", finalVideoResponse.data.videoUrl);
-    
-            // Step 6: Upload video to Firebase for preview
-            // const dbPreviewUrl = await uploadAndSaveVideo(videoUrl);
+
             setPreviewUrl(finalVideoResponse.data.videoUrl);
     
         } catch (error) {
             console.error("❌ Error processing video:", error);
             setIsProcessingVideo(false);
-            // window.location.href = "/error";
+            window.location.href = "/error";
         } finally {
             setLoading(false);
             setIsProcessingVideo(false);
@@ -212,7 +203,24 @@ function VideoGenerator() {
     const waitBeforePolling = () => {
         return new Promise(resolve => {
             console.log("⏳ Waiting for AI Generation...");
+            let messages = [
+                "⏳ Waiting: Holding for AI magic...",
+                "✨ Waiting: Creating AI-powered video...",
+                "🔄 Waiting: Processing, hang tight...",
+                "🚀 Waiting: AI is working hard on this...",
+                "🎬 Waiting: Finalizing the masterpiece...",
+                "🤖 Waiting: Bringing AI visuals to life...",
+                "📽️ Waiting: Almost there, just a little longer..."
+            ];
+
+            let attempt = 0;
+            const interval = setInterval(() => {
+                console.log(messages[attempt % messages.length]); // Cycle through messages
+                attempt++;
+            }, 30000);
+
             setTimeout(() => {
+                clearInterval(interval);
                 console.log("✅ Starting polling...");
                 resolve();
             }, 180000); // 180000ms = 3 minutes
@@ -265,7 +273,8 @@ function VideoGenerator() {
     
         if (emailValue === "" || emailRegex.test(emailValue)) {
             setIsValidEmail(true);
-            localStorage.setItem("email", emailValue); // Store the email in localStorage if valid or empty
+            localStorage.setItem("email", emailValue);
+            localStorage.setItem("emailValid", true);
         } else {
             setIsValidEmail(false);
             console.error("Invalid email address");
@@ -318,12 +327,11 @@ function VideoGenerator() {
             return;
         }
 
-        // TODO: Email
-        // if (!isValidEmail && email != "") {
-        //     handleUpdateStatus("Please enter a valid email.");
-        //     toast.error("Please enter a valid email.");
-        //     return;
-        // }
+        if (!isValidEmail && email != "") {
+            handleUpdateStatus("Please enter a valid email.");
+            toast.error("Please enter a valid email.");
+            return;
+        }
         
         processVideo();
     };
@@ -354,12 +362,12 @@ function VideoGenerator() {
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
                     {/* ***** Email ***** */}
-                    {/* <div className="w-full">
+                    <div className="w-full">
                         <h3 className="text-2xl font-bold w-full text-start">Email (Optional)</h3>
                         <p className="text-gray-700 w-full">We'll send you a link to download your video.</p>
                         {!isValidEmail && email != "" && <p className="text-red-600 font-bold">*Please enter a valid email.</p>}
                         <input type="email" value={email} placeholder="Email" className="block w-full border rounded-lg p-2 h-12" onChange={handleEnterEmail} />
-                    </div> */}
+                    </div>
        
 
                     {/* ***** Upload ***** */}
