@@ -6,11 +6,12 @@ import AdminVideos from '../components/AdminVideos';
 import Dashboard from '../components/Dashboard';
 import EmergencyActions from '../components/EmergencyActions';
 import Campaigns from '../components/Campaigns';
+import Errors from '../components/Errors';
 
 const Admin = () => {
 	const navigate = useNavigate();
 	const [currentScreen, setCurrentScreen] = useState(parseInt(localStorage.getItem("currentScreen")) || 0);
-	const tabs = [<Dashboard />, <AdminVideos />, <EmergencyActions />, <Campaigns />];
+	const tabs = [<Dashboard />, <AdminVideos />, <EmergencyActions />, <Campaigns />, <Errors />];
 
 	const setCurrentScreenIndex = (index) => {
 		setCurrentScreen(index);
@@ -93,6 +94,21 @@ const Admin = () => {
                                 </span>
 								<span className="text-center text-xs md:text-base">
 									Campaigns
+								</span>
+                            </a>
+                        </li>
+						<li className="hover:bg-primary-dark hover:cursor-pointer" onClick={() => setCurrentScreenIndex(4)}>
+                            <a className="text-white text-xl hover:text-gray-300 flex flex-col items-center justify-center p-4">
+                                <span className="mr-2">
+								<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path d="M12 2L2 22H22L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+									<path d="M12 16V12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+									<circle cx="12" cy="19" r="1" fill="white"/>
+								</svg>
+
+                                </span>
+								<span className="text-center text-xs md:text-base">
+									Errors
 								</span>
                             </a>
                         </li>
