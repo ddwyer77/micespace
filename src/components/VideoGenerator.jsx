@@ -327,11 +327,11 @@ function VideoGenerator() {
             return;
         }
 
-        if (!isValidEmail && email != "") {
-            handleUpdateStatus("Please enter a valid email.");
-            toast.error("Please enter a valid email.");
-            return;
-        }
+        // if (!isValidEmail && email != "") {
+        //     handleUpdateStatus("Please enter a valid email.");
+        //     toast.error("Please enter a valid email.");
+        //     return;
+        // }
         
         processVideo();
     };
@@ -362,12 +362,12 @@ function VideoGenerator() {
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
                     {/* ***** Email ***** */}
-                    <div className="w-full">
+                    {/* <div className="w-full">
                         <h3 className="text-2xl font-bold w-full text-start">Email (Optional)</h3>
                         <p className="text-gray-700 w-full">We'll send you a link to download your video.</p>
                         {!isValidEmail && email != "" && <p className="text-red-600 font-bold">*Please enter a valid email.</p>}
                         <input type="email" value={email} placeholder="Email" className="block w-full border rounded-lg p-2 h-12" onChange={handleEnterEmail} />
-                    </div>
+                    </div> */}
        
 
                     {/* ***** Upload ***** */}
@@ -503,7 +503,7 @@ function VideoGenerator() {
                         onClose={() => setIsVideoModalOpen(false)}
                     >
                         <h3 className="text-2xl font-bold mb-4">Preview Video</h3>
-                        <video controls className="w-full rounded-lg">
+                        <video controls className="w-full max-h-[600px] rounded-lg">
                             <source src={videoToPreview} type="video/mp4" />
                             Your browser does not support the video tag.
                         </video>

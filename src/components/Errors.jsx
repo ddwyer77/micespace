@@ -12,8 +12,11 @@ const Errors = () => {
         try {
             const errorsData = await getCollectionDocs("errors");
             console.log("Fetched Errors:", errorsData); // Debugging
+    
             if (errorsData && Array.isArray(errorsData)) {
-                const sortedErrors = errorsData.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+                const sortedErrors = errorsData.sort((a, b) => 
+                    (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)
+                );
                 setErrors(sortedErrors);
             } else {
                 console.error("Unexpected data format for errors:", errorsData);
@@ -22,6 +25,7 @@ const Errors = () => {
             console.error("Error fetching errors:", error);
         }
     };
+    
 
     return (
         <div className="p-12">
