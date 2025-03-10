@@ -61,8 +61,8 @@ if (loading) {
 }
 
   return (
-    <div className="relative w-full max-w-[340px] mx-auto overflow-hidden rounded-2xl">
-      <div className="relative flex items-center justify-center w-[360px] h-[640px]">
+    <div className="relative w-full max-w-[340px] rounded-2xl">
+      <div className="relative flex items-center justify-center h-[640px]">
         <motion.div
           key={currentIndex}
           initial={{ opacity: 0, x: 50 }}

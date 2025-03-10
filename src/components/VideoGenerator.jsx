@@ -4,9 +4,6 @@ import loadingMessages from "../utils/loadingMessages.js";
 import { getFileUrl, uploadFile, deleteFile, addDocument, getFirestoreData, getCollectionDocs } from "../utils/storage.js";
 import uploadGeneratedVideosForFeed from "../utils/uploadGeneratedVideosForFeed.js";
 import logoSlogan from '../assets/images/logo_slogan.png';
-import MarvinCheese from '../assets/images/marvin_cheese.jpeg';
-import TuffestBear from '../assets/images/tuffest_bear.jpeg';
-import MiceBandOriginal from '../assets/images/mice_band_original.jpeg';
 import VideoDownloader from "./VideoDownloader.jsx";
 import Feed from './Feed';
 import TikTokIcon from "../assets/icons/TikTokIcon.jsx";
@@ -18,25 +15,28 @@ import Card from "./Card.jsx";
 function VideoGenerator() {
     const [ videoFile, setVideoFile ] = useState(null);
     const [ messageIsCritial, setMessageIsCritial ] = useState(false);
-    const [ originalVidUrl, setOriginalVidUrl ] = useState("");
     const [ loading, setLoading ] = useState(false);
     const [ uploading, setUploading ] = useState(false);
     const [ status, setStatus ] = useState("");
     const [ downloadUrl, setDownloadUrl ] = useState("");
+    const [ previewUrl, setPreviewUrl ] = useState("");
     const [ loadingMessageIndex, setLoadingMessageIndex ] = useState(0);
     const [ progress, setProgress ] = useState(0);
-    const [ isRedirectError, setIsRedirectError ] = useState(false);
     const [ campaigns, setCampaigns ] = useState([]);
     const [ currentCampaign, setCurrentCampaign ] = useState(0);
     const [ generationData, setGenerationData ] = useState(null);
-    const clipLength = 5;
-    const [ ingestedVideoId, setIngestedVideoId ] = useState("");
     const [ isModalOpen, setIsModalOpen ] = useState(false);
-    const [ isPendingVideoModalOpen, setIsPendingVideoModalOpen ] = useState(false);
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [videoToPreview, setVideoToPreview] = useState("");
     const [ hasAcceptedTerms, setHasAcceptedTerms ] = useState(false);
     const [ showError, setShowError ] = useState(false);
-    const [ currentVideoInProgressData, setCurrentVideoInProgressData ] = useState(null);
-    const [isMerging, setIsMerging] = useState(false); 
+    const [ isProcessingVideo, setIsProcessingVideo ] = useState(false);
+    const [ email, setEmail ] = useState("");
+    const [ isValidEmail, setIsValidEmail ] = useState(false);
+    const [ isAuthenticated, setIsAuthenticated ] = useState(false);
+    const isLocal = import.meta.env.VITE_NODE_ENV === "development" || !import.meta.env.VITE_API_BASE_URL;
+    const baseUrl = isLocal ? "http://localhost:5000" : import.meta.env.VITE_API_BASE_URL;
+    const clipLength = 5;
 
     useEffect(() => {     
         if (!loading) return;
@@ -48,34 +48,16 @@ function VideoGenerator() {
     }, [loading]);
 
     useEffect(() => {
-        const storedData = localStorage.getItem("currentVideoInProgress");
-    
-        if (storedData) {
-            try {
-                const parsedData = JSON.parse(storedData);
-                if (
-                    parsedData &&
-                    typeof parsedData === "object" &&
-                    parsedData.task_id &&
-                    parsedData.trimmed_video_url &&
-                    parsedData.task_id.trim() !== "" &&
-                    parsedData.trimmed_video_url.trim() !== ""
-                ) {
-                    setCurrentVideoInProgressData(parsedData);
-                    setIsPendingVideoModalOpen(true);
-                } else {
-                    console.warn("Invalid data structure in localStorage:", parsedData);
-                    localStorage.removeItem("currentVideoInProgress"); // Clear invalid data
-                }
-            } catch (error) {
-                localStorage.removeItem("currentVideoInProgress"); // Remove invalid entry
-            }
-        }
-    }, []);
-
-    useEffect(() => {
         fetchCampaigns();
     }, [])
+
+    useEffect(() => {
+        const storedEmail = localStorage.getItem("email");
+        if (storedEmail) {
+            setEmail(storedEmail);
+            setIsValidEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(storedEmail));
+        }
+    }, []);
 
     useEffect(() => {
         if (campaigns.length > 0 && !generationData) {
@@ -89,12 +71,30 @@ function VideoGenerator() {
         }
     }, [campaigns]);
 
+    const getVideoProcessProgress = () => {
+        const duration = 500;
+        const intervalTime = 1000; // 1 second
+        const increment = 100 / duration; // Increment per second
+    
+        setProgress(0); // Reset progress
+    
+        const interval = setInterval(() => {
+            setProgress((prevProgress) => {
+                const newProgress = prevProgress + increment;
+                if (newProgress >= 100) {
+                    clearInterval(interval);
+                    return 100;
+                }
+                return newProgress;
+            });
+        }, intervalTime);
+    };
+
     const fetchCampaigns = async () => {
         try {
             const campaigns = await getCollectionDocs("campaigns");
             const sortedCampaigns = campaigns.sort((a, b) => a.sort - b.sort);
             setCampaigns(sortedCampaigns);
-            console.log("Campaigns:", campaigns);
         } catch (error) {
             console.error("Error fetching campaigns:", error);
         }
@@ -106,93 +106,194 @@ function VideoGenerator() {
     
         if (!file) {
             console.error("No file selected");
+            setUploading(false);
             return;
         }
-   
+    
         const fileSizeMB = file.size / (1024 * 1024);
-        if (fileSizeMB > 150) {
-            console.error("File is larger than 150 MB");
-            handleCriticalError("*File must be 150 MB or smaller.");
+        if (fileSizeMB > 80) {
+            console.error("File is larger than 80 MB");
+            handleCriticalError("*File must be 80 MB or smaller.");
             setUploading(false);
             return;
         }
     
-        setVideoFile(file);
-        setStatus("");
-        const sanitizedFileName = file.name.replace(/\s+/g, "_");
-        const fileExtension = getFileExtension(file.name); 
-    
-        try {
-            // Upload to Firebase
-            handleUpdateStatus("Uploading original video...", 0);
-            const uploadedUrl = await uploadFile(file, `videos/${sanitizedFileName}`);
-            console.log("Uploaded Video:", uploadedUrl);
-            setOriginalVidUrl(uploadedUrl); 
-    
-            // Compress the uploaded video
-            handleUpdateStatus("Compressing video...", 0);
-            const response = await axios.post("/.netlify/functions/compressVideo", { videoUrl: uploadedUrl, type: fileExtension });
-            console.log("Compression Response:", response.data.data.id);
-            setIngestedVideoId(response.data.data.id);
-    
-            handleUpdateStatus("Video uploaded.", 0);
-            setUploading(false);
-        } catch (error) {
-            console.error("Error uploading video:", error);
-            handleCriticalError("Failed to upload video.");
-            setUploading(false);
-        }
-    };
-      
-    const getFileExtension = (filename) => {
-        console.log("Extracting file extension for:", filename);
-        const match = filename.match(/\.([a-zA-Z0-9]+)$/);
-        return match ? match[1].toLowerCase() : '';
+        setVideoFile(file); // Store the selected video file
+        setStatus("Video uploaded successfully.");
+        setUploading(false);
     };
 
-    const handleUpdateStatus = (message, progress) =>{
+    const processVideo = async () => {
+        if (!videoFile) {
+            alert("Please select a video file.");
+            return;
+        }
+
+        const currentEmail = (email && isValidEmail && email != "") ? email : null;
+    
+        setIsProcessingVideo(true);
+        setProgress(0);
+        getVideoProcessProgress();
+        setLoading(true);
+        setDownloadUrl("");
+    
+        const formData = new FormData();
+        formData.append("originalVideo", videoFile);
+        formData.append("prompt", generationData.prompt);
+        formData.append("clipLength", clipLength);
+        formData.append("audioUrl", generationData.audioUrl);
+        formData.append("generationType", generationData.generationType);
+        formData.append("email", email);
+    
+        try {
+            // Step 1: Get Task Id
+            const response = await axios.post(`${baseUrl}/api/get-task-id`, formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+    
+            let { task_id, trimmed_video } = response.data;
+
+            if (task_id) {
+                localStorage.setItem("task_id", task_id);
+            }
+
+            //TODO: swap before merge
+            // task_id = '241528415490229';
+            await waitBeforePolling();
+
+            const file_id = await pollMiniMaxForVideo(task_id);
+            console.log("🎥 AI-generated video File ID:", file_id);
+    
+            formData.append("aiVideoFileId", file_id);
+            formData.append("trimmedVideo", trimmed_video);
+
+            // Step 3: Wait for the final processed video 
+            const finalVideoResponse = await axios.post(
+                `${baseUrl}/api/complete-video`,
+                JSON.stringify({
+                    aiVideoFileId: file_id,
+                    trimmedVideo: trimmed_video,
+                    audioUrl: generationData.audioUrl,
+                    doubleGeneration: generationData.doubleGeneration,
+                    clipLength,
+                    generationType: generationData.generationType,
+                    email: currentEmail
+                }),
+                {
+                    headers: { "Content-Type": "application/json" },
+                    responseType: "json"
+                }
+            );
+  
+            setDownloadUrl(finalVideoResponse.data.videoUrl);
+            console.log("✅ Final video ready:", finalVideoResponse.data.videoUrl);
+
+            setPreviewUrl(finalVideoResponse.data.videoUrl);
+    
+        } catch (error) {
+            console.error("❌ Error processing video:", error);
+            setIsProcessingVideo(false);
+            window.location.href = "/error";
+        } finally {
+            setLoading(false);
+            setIsProcessingVideo(false);
+        }
+    };
+
+    const waitBeforePolling = () => {
+        return new Promise(resolve => {
+            console.log("⏳ Waiting for AI Generation...");
+            let messages = [
+                "⏳ Waiting: Holding for AI magic...",
+                "✨ Waiting: Creating AI-powered video...",
+                "🔄 Waiting: Processing, hang tight...",
+                "🚀 Waiting: AI is working hard on this...",
+                "🎬 Waiting: Finalizing the masterpiece...",
+                "🤖 Waiting: Bringing AI visuals to life...",
+                "📽️ Waiting: Almost there, just a little longer..."
+            ];
+
+            let attempt = 0;
+            const interval = setInterval(() => {
+                console.log(messages[attempt % messages.length]); // Cycle through messages
+                attempt++;
+            }, 30000);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                console.log("✅ Starting polling...");
+                resolve();
+            }, 180000); // 180000ms = 3 minutes
+        });
+    };
+
+    const pollMiniMaxForVideo = async (taskId) => {
+        const pollInterval = 15000; // 15 seconds
+        const maxRetries = 10; // 🔹 Max attempts before erroring out
+        let attempts = 0;
+    
+        console.log(`⏳ Starting polling for AI video with Task ID: ${taskId}`);
+    
+        while (attempts < maxRetries) {
+            try {
+                const response = await fetch("/.netlify/functions/poll-ai-video", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ taskId }),
+                });
+    
+                const data = await response.json();
+    
+                if (data.status === "Success") {
+                    console.log("✅ AI Video Ready:", data.file_id);
+                    return data.file_id; // Return file_id when done
+                }
+    
+                console.log(`⏳ Video still processing... Attempt ${attempts + 1} of ${maxRetries}`);
+            } catch (error) {
+                console.error("❌ Error polling MiniMax:", error);
+            }
+    
+            attempts++;
+            if (attempts >= maxRetries) {
+                console.error("❌ Maximum polling attempts reached. AI Video not ready.");
+                throw new Error("AI video processing timed out after 10 attempts.");
+            }
+    
+            await new Promise(res => setTimeout(res, pollInterval));
+        }
+    };
+
+    const handleEnterEmail = (event) => {
+        const emailValue = event.target.value;
+        setEmail(emailValue);
+    
+        // Regular expression for basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+        if (emailValue === "" || emailRegex.test(emailValue)) {
+            setIsValidEmail(true);
+            localStorage.setItem("email", emailValue);
+            localStorage.setItem("emailValid", true);
+        } else {
+            setIsValidEmail(false);
+            console.error("Invalid email address");
+        }
+    };
+
+    const handleUpdateStatus = (message) =>{
         setMessageIsCritial(false);
         setStatus(message);
-        setProgress(progress);
     }
 
     const handleCriticalError = (message) => {
         setMessageIsCritial(true);
         setStatus(message);
-        setProgress(0);
         setLoading(false);
-        setIsRedirectError(true);
     }
 
     const handleCheckboxChange = (event) => {
         setHasAcceptedTerms(event.target.checked);
-    };
-
-    const pollTaskStatus = async (task_id) => {
-        try {
-            let status = "Queueing";
-            let generatedVideoUrl = "";
-
-            while (["Queueing", "Processing", "Preparing"].includes(status)) {
-                await new Promise((resolve) => setTimeout(resolve, 20000)); // Wait 5 seconds
-
-                const response = await axios.post("/.netlify/functions/checkTaskStatus", { task_id });
-                const data = response.data;
-                status = data.status;
-
-                if (status === "Success") {
-                    generatedVideoUrl = data.generatedVideoUrl;
-                    return generatedVideoUrl;
-                } else if (status === "Fail") {
-                    throw new Error("Video generation failed.");
-                }
-
-                handleUpdateStatus(`Video generation status: ${status}`, 50);
-            }
-        } catch (error) {
-            console.error("Error polling task status:", error);
-            handleCriticalError("Failed to generate video.");
-        }
     };
 
     const handleSelectContent = (campaignIdx) => {
@@ -206,153 +307,14 @@ function VideoGenerator() {
         });
     };
 
-    const pollIngestedVideo = async (videoId, maxRetries = 30, delay = 5000) => {
-        let retries = 0;
-        while (retries < maxRetries) {
-            try {
-                const response = await axios.post("/.netlify/functions/getIngestedVideo", {
-                    videoId,
-                });
-                const rendition = response.data.attributes.outputs.renditions[0];
-                if (rendition && rendition.url) {
-                    return rendition.url;
-                }
-            } catch (error) {
-                console.error(`Error getting ingested video (attempt ${retries + 1}):`, error.message);
-            }
-        
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            retries++;
-        }
-    
-        throw new Error("Ingested video is not ready after maximum retries.");
+    const handleOpenVideoModal = (videoUrl) => {
+        setVideoToPreview(videoUrl);
+        setIsVideoModalOpen(true);
     };
-
-    async function mergeVideos(trimmedVideoUrl, task_id) {
-        setIsMerging(true);
-        const generatedVideoUrl = await pollTaskStatus(task_id);
-        console.log("Generated Video URL:", generatedVideoUrl);
-    
-        let videoUrls = [trimmedVideoUrl, generatedVideoUrl];
-        let audioLength = 5;
-
-        if (generationData.doubleGeneration == true) {
-            const generatedVideoUrls = await getDoubleVideoGeneration(generatedVideoUrl);
-            videoUrls = [trimmedVideoUrl, ...generatedVideoUrls];
-            audioLength = 10;
-        }
-
-        const mergeResponse = await axios.post("/.netlify/functions/mergeVideos", {
-            videoUrls,
-            audioUrl: generationData.audioUrl,
-            clipLength,
-            audioLength: audioLength
-        });
-    
-        const mergedVideoUrl = mergeResponse.data.renderUrl;
-        console.log("Merged Video URL:", mergedVideoUrl);
-    
-        setDownloadUrl(mergedVideoUrl);
-        await uploadAndSaveVideo(mergedVideoUrl)
-        handleUpdateStatus("Video generated successfully.", 100);
-        localStorage.removeItem("currentVideoInProgress");
-        setIsMerging(false);
-    }
-
-    async function uploadAndSaveVideo(mergedVideoUrl) {
-        const storagePath = `generatedVideosUnapproved/video-${Date.now()}.mp4`;
-        const videoTitle = storagePath.split('/').pop().split('.')[0];
-    
-        try {
-            const downloadUrl = await uploadGeneratedVideosForFeed(mergedVideoUrl, storagePath);
-            console.log("✅ Video uploaded to Firebase:", downloadUrl);
-         
-            const newDocId = await addDocument("videos", downloadUrl, videoTitle, generationData.generationType);
-            console.log("✅ New item added:", newDocId);
-    
-            return downloadUrl;
-        } catch (err) {
-            console.error("❌ Error uploading or saving video:", err);
-            throw err;
-        }
-    }
-
-    async function getIngestedVideoUrl(ingestedVideoId) {
-        try {
-            const ingestedVideoUrl = await pollIngestedVideo(ingestedVideoId);
-            if (!ingestedVideoUrl) {
-                throw new Error("Failed to retrieve ingested video URL.");
-            }
-            console.log("Ingested Video Url:", ingestedVideoUrl);
-            return ingestedVideoUrl;
-        } catch (error) {
-            console.error("Error getting ingested video:", error.message);
-            handleCriticalError("Failed to get ingested video URL.");
-            throw error;
-        }
-    }
-
-    async function getLastFrame(trimmedVideoUrl) {
-        try {
-            const response = await axios.post("/.netlify/functions/getLastFrame", {
-                trimmedVideoUrl,
-                clipLength,
-            });
-            const lastFrameDataUrl = response.data.renderUrl;
-            console.log("Last Frame:", lastFrameDataUrl);
-            return lastFrameDataUrl;
-        } catch (error) {
-            console.error("Error fetching last frame:", error);
-            handleCriticalError("Failed to fetch last frame.");
-            throw error;
-        }
-    }
-
-    async function trimVideo(ingestedVideoUrl) {
-        try {
-            handleUpdateStatus("Trimming video...", 20);
-            const response = await axios.post("/.netlify/functions/trimVideo", {
-              videoUrl: ingestedVideoUrl,
-              clipLength
-            });
-            const trimmedVideoUrl = response.data.trimmedVideoUrl;
-            console.log("Trimmed Video:", trimmedVideoUrl);
-            return trimmedVideoUrl;
-        } catch (error) {
-            console.error(error);
-            handleCriticalError("Failed to trim video.");
-            return;
-        }
-    }
-
-    async function getAiGeneratedVideoTaskId(lastFrameDataUrl, alternatePrompt = null) {
-        const prompt = alternatePrompt ? alternatePrompt : generationData.prompt;
-        try {
-            const response = await axios.post("/.netlify/functions/generateMiniMaxiVideo", {
-                model: "video-01",
-                prompt: prompt,
-                first_frame_image: lastFrameDataUrl,
-            });
-            return response.data;
-        } catch (error) {
-            console.error(error);
-            handleCriticalError("Failed create AI generation task.");
-            return;
-        }
-    }
-
-    async function getDoubleVideoGeneration(firstGeneratedVideo) {
-        const lastFrame = await getLastFrame(firstGeneratedVideo);
-        handleUpdateStatus("Finishing up ai video generation...", 55);
-        const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame, generationData.prompt);
-        const secondGeneratedVideo = await pollTaskStatus(aiGeneratedVideoTaskId.task_id);
-        const videoUrls = [firstGeneratedVideo, secondGeneratedVideo];
-        return videoUrls;
-    }
 
     const handleGenerateVideo = async () => {
         if (!videoFile) {
-            handleUpdateStatus("Please upload a video file.", 0);
+            handleUpdateStatus("Please upload a video file.");
             toast.error("Please upload a video to start your generation.");
             return;
         }
@@ -365,80 +327,48 @@ function VideoGenerator() {
             return;
         }
 
-        setLoading(true);
-        handleUpdateStatus("Initializing process...", 5);
+        // if (!isValidEmail && email != "") {
+        //     handleUpdateStatus("Please enter a valid email.");
+        //     toast.error("Please enter a valid email.");
+        //     return;
+        // }
+        
+        processVideo();
+    };
 
-        try {
-            // ********************************************
-            // *     Get Ingested Video
-            // ********************************************
-            const ingestedVideoUrl = await getIngestedVideoUrl(ingestedVideoId);
-
-            // ********************************************
-            // *     Trim Video To 5 Seconds
-            // ********************************************
-            const trimmedVideoUrl = await trimVideo(ingestedVideoUrl);
-
-            // ********************************************
-            // *     Get Last Frame
-            // ********************************************
-            const lastFrame = await getLastFrame(trimmedVideoUrl);
-                        
-            // ********************************************
-            // *     Send Request to MiniMaxi 
-            // ********************************************
-            handleUpdateStatus("Generating Video...", 40);
-            const aiGeneratedVideoTaskId = await getAiGeneratedVideoTaskId(lastFrame);
-
-
-            // ********************************************
-            // *     Save Task In Case Of Refresh
-            // ********************************************
-            const { task_id } = aiGeneratedVideoTaskId;
-            localStorage.setItem("currentVideoInProgress", JSON.stringify({"task_id": task_id, "trimmed_video_url": trimmedVideoUrl}));
-            toast.success("Your video is still generating. Progress saved. Please continue to wait...");
-            console.log("Task ID:", task_id);
-
-            try {
-                await mergeVideos(trimmedVideoUrl, task_id);
-            } catch (error) {
-                console.error("❌ Error during video merge:", error);
-                handleCriticalError("Failed to merge video.");
-                throw error;
-            }
-
-        } catch (error) {
-            console.error("Error generating video:", error.message);
-            handleCriticalError("Failed to generate video.");
-            document.write("Error generating video:", error.message);
-        } finally {
-            setLoading(false);
-
-            // ********************************************
-            // *     Delete Original Video
-            // ********************************************
-            try {
-                if (originalVidUrl) {
-                    const filePath = decodeURIComponent(originalVidUrl.split("/o/")[1].split("?")[0]);
-                    await deleteFile(filePath);
-                    console.log("Original video deleted from Firebase.");
-                } else {
-                    console.log("No original video URL available to delete.");
-                }
-            } catch (error) {
-                console.error("Error deleting video from Firebase:", error.message);
-            }
-            if (isRedirectError) {
-                window.location.href = "/error";
-            }
+    const handleShareToTikTok = async () => {
+        if (!downloadUrl) {
+            console.error("No video available to share.");
+            return;
         }
+   
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.setAttribute("download", "miceband_video.mp4");
+        document.body.appendChild(link);
+    
+        link.click();
+ 
+        document.body.removeChild(link);
+    
+        setTimeout(() => {
+            window.location.href = "https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload";
+        }, 2000); 
     };
 
     return (
-        <div className="flex justify-center items-center w-screen flex-col p-4 mt-24 relative">
+        <div className="flex justify-center items-center flex-col p-4 mt-24 relative">
             <div className="max-w-2xl flex flex-col gap-4">
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
                     <img src={logoSlogan} alt="micespace logo"/>
+                    {/* ***** Email ***** */}
+                    {/* <div className="w-full">
+                        <h3 className="text-2xl font-bold w-full text-start">Email (Optional)</h3>
+                        <p className="text-gray-700 w-full">We'll send you a link to download your video.</p>
+                        {!isValidEmail && email != "" && <p className="text-red-600 font-bold">*Please enter a valid email.</p>}
+                        <input type="email" value={email} placeholder="Email" className="block w-full border rounded-lg p-2 h-12" onChange={handleEnterEmail} />
+                    </div> */}
+       
 
                     {/* ***** Upload ***** */}
                     <div className="w-full">
@@ -449,29 +379,6 @@ function VideoGenerator() {
                             onChange={handleVideoUpload}
                             className="block w-full mt-2 border rounded-lg p-2"
                         />
-                    </div>
-
-                    {/* ***** Select Content ***** */}
-                    <div>
-                        <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {campaigns.length > 0 && generationData ? (
-                                campaigns
-                                    .filter(campaign => campaign) // Ensure campaign is not undefined/null
-                                    .map((campaign, idx) => (
-                                        <Card 
-                                            key={idx}
-                                            onClick={() => handleSelectContent(idx)} 
-                                            imageUrl={campaign?.image || ""} 
-                                            name={campaign?.name || "Unknown"}
-                                            isSelected={currentCampaign === idx} 
-                                            loading={loading}
-                                        />
-                                    ))
-                            ) : (
-                                <p>Loading Campaigns...</p>
-                            )}
-                        </div>
                     </div>
 
                     {showError && <strong className="mt-4 text-red-600">Please accept the terms of service.</strong>}
@@ -500,53 +407,6 @@ function VideoGenerator() {
                         )}
                     </div>
 
-                    <Modal isOpen={isPendingVideoModalOpen} onClose={() => setIsPendingVideoModalOpen(false)}>
-                        <div className="flex flex-col items-center">
-                            <h2>Pending video</h2>
-                            <p>It looks like you may have had a video processing.</p>
-                            {(!downloadUrl && isMerging) && (
-                                <div>
-                                    <div className="loading mx-auto">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
-                                    <span>This could take up to 5 minutes.</span>
-                                </div>
-                            )}
-
-                            <button
-                                className={`px-4 py-2 rounded mt-4 block text-center w-full max-w-80 ${
-                                    downloadUrl
-                                        ? "bg-blue-600 text-white" // ✅ Download button when ready
-                                        : "bg-green-600 text-white" // ✅ Retrieve button before merging
-                                }`}
-                                onClick={async () => {
-                                    if (!downloadUrl && currentVideoInProgressData) {
-                                        await mergeVideos(
-                                            currentVideoInProgressData.trimmed_video_url,
-                                            currentVideoInProgressData.task_id
-                                        );
-                                    } else {
-                                        window.open(downloadUrl, "_blank");
-                                    }
-                                }}
-                                disabled={isMerging}
-                            >
-                                {downloadUrl ? "Download Video" : isMerging ? "Retrieving Video..." : "Retrieve Video"}
-                            </button>
-                            <button onClick={()=>{
-                                    localStorage.removeItem("currentVideoInProgress")
-                                    setIsPendingVideoModalOpen(false)
-                                }} 
-                                className="bg-gray-300 px-4 py-2 rounded mt-4 block text-center w-full max-w-80">
-                                Discard
-                            </button>
-                        </div>
-                    </Modal>
-
                     <Modal
                         isOpen={isModalOpen}
                         onClose={() => setIsModalOpen(false)}
@@ -572,53 +432,94 @@ function VideoGenerator() {
                                 <span></span>
                                 <span></span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-4">
-                                <div
-                                className="bg-primary h-4 rounded-full"
-                                style={{ width: `${progress}%` }}
-                                ></div>
-                            </div>
+                            {isProcessingVideo && (
+                                <div className="w-full bg-gray-200 rounded-full h-4">
+                                    <div
+                                    className="bg-primary h-4 rounded-full"
+                                    style={{ width: `${progress}%` }}
+                                    ></div>
+                                </div>  
+                            )}
                             <p>{generationData.loadingMessages[loadingMessageIndex]}</p>
                         </div>
                     )}
 
-                    {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 8 minutes. Please don't close the page.</p>)}
+                    {loading && (<p className="mt-4 text-gray-700">Your video is being processed. This could take up to 5 minutes. <span className="font-bold italic text-red-600">**Please don't close the page.</span></p>)}
                     {status && <p className={`mt-4 ${messageIsCritial ? "text-red-600" : "text-gray-700"}`}>{status}</p>}
 
-                    {downloadUrl && (
+                    {downloadUrl && previewUrl && (
                         <div className="w-full flex flex-col gap-4">
                             <a
-                                href={downloadUrl}
+                                onClick={() => handleOpenVideoModal(previewUrl)}
                                 target="_blank"
                                 download
                                 className="block bg-green-600 text-white hover:text-white hover:bg-green-700 px-4 rounded-lg w-full text-center py-4"
                                 >
                                 View Video
                             </a>
-                            <VideoDownloader 
-                                videoUrl={downloadUrl} 
-                                fileName="miceband_video.mp4" 
-                                bgColor="bg-gray" 
-                                hoverBgColor="bg-slate-900" 
-                                textColor="text-white"
-                                textContent="Download Video"
-                            />
-                            <VideoDownloader 
-                                videoUrl={downloadUrl} 
-                                fileName="miceband_video.mp4" 
-                                bgColor="bg-[#23E7E0]" 
-                                hoverBgColor="bg-[#64fffa]" 
-                                redirectUrl="https://www.tiktok.com/login?lang=en&redirect_url=https%3A%2F%2Fwww.tiktok.com%2Fupload" 
-                                textColor="text-black"
-                                icon={<TikTokIcon />}
-                                textContent="Share To TikTok"
-                            />
+                            <a
+                                href={downloadUrl}
+                                target="_blank"
+                                download
+                                className="block bg-slate-900 text-white hover:text-white hover:bg-slate-900 px-4 rounded-lg w-full text-center py-4"
+                                >
+                                Download Video
+                            </a>
+                            <button
+                                onClick={handleShareToTikTok}
+                                className="flex justify-center items-center bg-[#23E7E0] text-white hover:text-white hover:bg-[#64fffa] px-4 rounded-lg w-full text-center py-4"
+                            >
+                            {<TikTokIcon />} Share To TikTok
+                            </button>
                         </div>
                     )}
+
+                    {/* ***** Select Content ***** */}
+                    <div>
+                        <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {campaigns.length > 0 && generationData ? (
+                                campaigns
+                                    .filter(campaign => campaign) // Ensure campaign is not undefined/null
+                                    .map((campaign, idx) => (
+                                        <Card 
+                                            key={idx}
+                                            onClick={() => handleSelectContent(idx)} 
+                                            imageUrl={campaign?.image || ""} 
+                                            name={campaign?.name || "Unknown"}
+                                            isSelected={currentCampaign === idx} 
+                                            loading={loading}
+                                        />
+                                    ))
+                            ) : (
+                                <p>Loading Campaigns...</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ***** Video Modal ***** */}
+                    <Modal
+                        isOpen={isVideoModalOpen}
+                        onClose={() => setIsVideoModalOpen(false)}
+                    >
+                        <h3 className="text-2xl font-bold mb-4">Preview Video</h3>
+                        <video controls className="w-full max-h-[600px] rounded-lg">
+                            <source src={videoToPreview} type="video/mp4" />
+                            Your browser does not support the video tag.
+                        </video>
+                        <div className="flex justify-end mt-4">
+                            <button 
+                                onClick={() => setIsVideoModalOpen(false)} 
+                                className="bg-gray-500 text-white px-4 py-2 rounded"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </Modal>
+
                     <Feed />
                 </div>
             </div>
-            
         </div>
     );
 }
