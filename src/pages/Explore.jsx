@@ -1,8 +1,46 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCollectionDocs } from "../utils/storage.js";
 import Modal from "../components/Modal.jsx";
 import Loader from "../components/Loader.jsx";
+import { useInView } from "react-intersection-observer";
+import videoPlaceholder from "../assets/images/video-placeholder.png";
+
+const VideoCard = ({ videoUrl, onClick }) => {
+  const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.1 });
+
+  const handleMouseEnter = (e) => e.target.play();
+
+  const handleMouseLeave = (e) => {
+    e.target.pause();
+    e.target.currentTime = 0; // Reset to the start
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="aspect-9-16 overflow-hidden rounded-md cursor-pointer"
+      onClick={onClick}
+    >
+      {inView ? (
+        <video
+          src={videoUrl}
+          muted
+          loop
+          className="w-full h-48 object-cover"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        />
+      ) : (
+        <img
+          className="w-full h-48 animate-pulse rounded-md"
+          src={videoPlaceholder}
+          alt="Video placeholder"
+        />
+      )}
+    </div>
+  );
+};
 
 const Explore = () => {
   const [generatedVideos, setGeneratedVideos] = useState([]);
@@ -12,14 +50,12 @@ const Explore = () => {
   const navigate = useNavigate();
 
   // Shuffle Function
-  const shuffleArray = (array) => {
-    return array.sort(() => Math.random() - 0.5);
-  };
+  const shuffleArray = (array) => array.sort(() => Math.random() - 0.5);
 
   useEffect(() => {
     const fetchVideos = async () => {
       setIsLoading(true);
-      setError(""); // Reset error before fetching
+      setError("");
 
       try {
         const videos = await getCollectionDocs("videos");
@@ -42,25 +78,9 @@ const Explore = () => {
     fetchVideos();
   }, []);
 
-  // Handle video play on hover
-  const handleMouseEnter = (e) => {
-    e.target.play();
-  };
-
-  const handleMouseLeave = (e) => {
-    e.target.pause();
-    e.target.currentTime = 0;
-  };
-
-  // Open Modal and Set Selected Video
-  const handleVideoClick = (videoUrl) => {
-    setSelectedVideo(videoUrl);
-  };
-
-  // Close Modal
-  const closeModal = () => {
-    setSelectedVideo(null);
-  };
+  // Modal Handling
+  const handleVideoClick = (videoUrl) => setSelectedVideo(videoUrl);
+  const closeModal = () => setSelectedVideo(null);
 
   return (
     <div className="flex min-h-screen justify-start items-start flex-col p-4 mt-24">
@@ -92,20 +112,11 @@ const Explore = () => {
         ) : (
           <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {generatedVideos.map((video) => (
-              <li
+              <VideoCard
                 key={video.id}
-                className="aspect-9-16 overflow-hidden rounded-md cursor-pointer"
+                videoUrl={video.url}
                 onClick={() => handleVideoClick(video.url)}
-              >
-                <video
-                  src={video.url}
-                  muted
-                  loop
-                  className="w-full h-48 object-cover"
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                />
-              </li>
+              />
             ))}
           </ul>
         )}
