@@ -193,7 +193,6 @@ function VideoGenerator() {
         } catch (error) {
             console.error("❌ Error processing video:", error);
             setIsProcessingVideo(false);
-            window.location.href = "/error";
         } finally {
             setLoading(false);
             setIsProcessingVideo(false);
