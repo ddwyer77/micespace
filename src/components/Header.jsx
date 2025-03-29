@@ -15,7 +15,7 @@ const Header = () => {
   return (
     <header className="bg-white shadow-md w-full z-50">
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link to="/">
+        <Link to="/" className="hidden md:block">
           <img src={logoSlogan} alt="MiceSpace Logo" className="w-40 sm:w-48" />
         </Link>
 

@@ -3,8 +3,8 @@ import React from 'react';
 const TermsOfService = () => (
     <div>
         <h1 className="text-3xl mb-4 font-bold">Terms of Service</h1>
-        <p>Effective Date: [Insert Date]</p>
-        <p>Welcome to [Your Site Name] (“we,” “our,” or “us”). By using our video generation service, you agree to the following Terms of Service. If you do not agree, do not use our services.</p>
+        <p>Effective Date: March 29, 2025</p>
+        <p>Welcome to MiceBand.com (“we,” “our,” or “us”). By using our video generation service, you agree to the following Terms of Service. If you do not agree, do not use our services.</p>
         
         <h2 className="text-2xl mt-4 mb-2">1. Acceptance of Terms</h2>
         <p>By accessing or using our video generation services, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service and our Privacy Policy.</p>
