@@ -1,8 +1,9 @@
+import VideoGenerator from "../components/VideoGenerator";
+
 const Create = () => {
     return (
-        <div className="Create">
-        <h1>Create</h1>
-        <p>Create the latest videos and trends.</p>
+        <div className="min-h-screen">
+            <VideoGenerator pageType='create'/>
         </div>
     );
 }

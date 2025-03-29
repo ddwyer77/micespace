@@ -2,9 +2,8 @@ import VideoGenerator
  from "../components/VideoGenerator";
 const Campaigns = () => {
     return (
-        <div>
-            <VideoGenerator />
-
+        <div className="min-h-screen">
+            <VideoGenerator pageType='campaign'/>
         </div>
     )
 }

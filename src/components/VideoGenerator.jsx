@@ -12,7 +12,7 @@ import TermsOfService from "./TermsOfService.jsx";
 import { toast } from "react-toastify";
 import Card from "./Card.jsx";
 
-function VideoGenerator() {
+function VideoGenerator({ pageType }) {
     const [ videoFile, setVideoFile ] = useState(null);
     const [ messageIsCritial, setMessageIsCritial ] = useState(false);
     const [ loading, setLoading ] = useState(false);
@@ -33,6 +33,7 @@ function VideoGenerator() {
     const [ isProcessingVideo, setIsProcessingVideo ] = useState(false);
     const [ email, setEmail ] = useState("");
     const [ isValidEmail, setIsValidEmail ] = useState(false);
+    const [ customPromptText, setCustomPromptText ] = useState("");
     const [ isAuthenticated, setIsAuthenticated ] = useState(false);
     const isLocal = import.meta.env.VITE_NODE_ENV === "development" || !import.meta.env.VITE_API_BASE_URL;
     const baseUrl = isLocal ? "http://localhost:5000" : import.meta.env.VITE_API_BASE_URL;
@@ -139,10 +140,10 @@ function VideoGenerator() {
     
         const formData = new FormData();
         formData.append("originalVideo", videoFile);
-        formData.append("prompt", generationData.prompt);
+        formData.append("prompt", pageType === "create" ? customPromptText : generationData.prompt);
         formData.append("clipLength", clipLength);
-        formData.append("audioUrl", generationData.audioUrl);
-        formData.append("generationType", generationData.generationType);
+        formData.append("audioUrl", pageType === "create" ? "" : generationData.audioUrl);
+        formData.append("generationType", pageType === "create" ? "custom" : generationData.generationType);
         formData.append("email", email);
     
         try {
@@ -355,10 +356,10 @@ function VideoGenerator() {
     };
 
     return (
-        <div className="flex justify-center items-center flex-col p-4 mt-24 relative">
-            <div className="max-w-2xl flex flex-col gap-4">
+        <div className="flex justify-center items-center flex-col p-4 mt-6 relative">
+            <div className="max-w-5xl flex flex-col gap-4">
                 <div className="flex flex-col gap-4 justify-center items-center md:min-w-[600px]">
-                    <img src={logoSlogan} alt="micespace logo"/>
+                    {/* <img src={logoSlogan} alt="micespace logo"/> */}
                     {/* ***** Email ***** */}
                     {/* <div className="w-full">
                         <h3 className="text-2xl font-bold w-full text-start">Email (Optional)</h3>
@@ -380,6 +381,28 @@ function VideoGenerator() {
                     </div>
 
                     {showError && <strong className="mt-4 text-red-600">Please accept the terms of service.</strong>}
+
+                    {pageType === "create" && (
+                        <div className="w-full">
+                            <h3 className="text-2xl font-bold w-full text-start">Add your prompt</h3>
+                            <small>The AI will generate a video from the last from of your upload and seamlessly stitch them together.</small>
+                            <input
+                                type="text"
+                                value={customPromptText}
+                                placeholder="Add your prompt"
+                                className="block w-full border rounded-lg p-2 h-12 mt-2"
+                                onChange={(e) => {
+                                    const maxLength = 100;
+                                    if (e.target.value.length > maxLength) {
+                                    alert(`Maximum character limit of ${maxLength} reached!`);
+                                    return;
+                                    }
+                                    setCustomPromptText(e.target.value);
+                                }}
+                                />
+                        </div>
+               
+                    )}
 
                     {/* ***** Generate ***** */}
                     <div className="w-full">
@@ -471,29 +494,30 @@ function VideoGenerator() {
                             </button>
                         </div>
                     )}
-
-                    {/* ***** Select Content ***** */}
-                    <div>
-                        <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {campaigns.length > 0 && generationData ? (
-                                campaigns
-                                    .filter(campaign => campaign) // Ensure campaign is not undefined/null
-                                    .map((campaign, idx) => (
-                                        <Card 
-                                            key={idx}
-                                            onClick={() => handleSelectContent(idx)} 
-                                            imageUrl={campaign?.image || ""} 
-                                            name={campaign?.name || "Unknown"}
-                                            isSelected={currentCampaign === idx} 
-                                            loading={loading}
-                                        />
-                                    ))
-                            ) : (
-                                <p>Loading Campaigns...</p>
-                            )}
+                    
+                    {pageType === "campaign" && (
+                        <div>
+                            <h3 className="text-2xl font-bold w-full text-start mb-2">Select your content</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {campaigns.length > 0 && generationData ? (
+                                    campaigns
+                                        .filter(campaign => campaign) // Ensure campaign is not undefined/null
+                                        .map((campaign, idx) => (
+                                            <Card 
+                                                key={idx}
+                                                onClick={() => handleSelectContent(idx)} 
+                                                imageUrl={campaign?.image || ""} 
+                                                name={campaign?.name || "Unknown"}
+                                                isSelected={currentCampaign === idx} 
+                                                loading={loading}
+                                            />
+                                        ))
+                                ) : (
+                                    <p>Loading Campaigns...</p>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* ***** Video Modal ***** */}
                     <Modal
@@ -514,8 +538,6 @@ function VideoGenerator() {
                             </button>
                         </div>
                     </Modal>
-
-                    <Feed />
                 </div>
             </div>
         </div>
