@@ -146,7 +146,6 @@ function VideoGenerator() {
         formData.append("email", email);
     
         try {
-            // Step 1: Get Task Id
             const response = await axios.post(`${baseUrl}/api/get-task-id`, formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
